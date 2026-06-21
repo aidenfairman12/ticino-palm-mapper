@@ -1,0 +1,55 @@
+# Area-of-interest and run configuration.
+# Start SMALL — one municipality — before scaling to the canton.
+
+aoi:
+  name: "lugano_example"
+  # Bounding box in EPSG:2056 (CH1903+ / LV95), in metres.
+  # SANITY-CHECK box near Lugano (southern Ticino): ~500 x 500 m. Picked because
+  # GBIF has a dense cluster of Trachycarpus fortunei occurrences here (~68 points),
+  # so the first run produces tiles with palms you can actually eyeball. Scale up to
+  # the municipality once alignment looks right.
+  # Order: [xmin, ymin, xmax, ymax]
+  bbox_lv95: [2718000, 1115000, 2718500, 1115500]   # ~500 x 500 m palm-dense box
+  crs: "EPSG:2056"
+  # SCALE WARNING: at 0.10 m/px a 1024px tile covers only ~100 m on the ground.
+  # A 4 x 4 km box => ~2000 tiles. Scale the bbox up only after the sanity check;
+  # use imagery.max_tiles below as a guard rail while experimenting.
+
+imagery:
+  product: "swissimage-10cm"
+  # SWISSIMAGE is flown on a ~3-year cycle, so not every year exists for every
+  # AOI. This area has 2018 / 2021 / 2024. Script 00 lists the available years and
+  # errors if this one is missing rather than silently writing zero tiles.
+  year: 2024                 # single-vintage default (script 00)
+  years: [2018, 2021, 2024]  # vintages for the temporal stack (script 04)
+  source: "stac"             # one of: "stac" (swisstopo COG) | "gee" (Earth Engine)
+  bands: ["R", "G", "B"]     # add NIR only if using SWISSIMAGE RS (not free)
+  res_m: 0.10                # ground sampling distance of the chosen COG asset
+  tile_size_px: 1024         # model-tile size to cut the 1 km² COGs into
+  tile_overlap_px: 128       # overlap so palms on tile borders aren't lost
+  max_tiles: 50              # safety cap while experimenting (null/remove = no cap)
+
+labels:
+  # source: "gbif"  -> fetch occurrence points directly from the GBIF API (no
+  #                    account, free; GBIF mirrors Info Flora's Swiss records).
+  # source: "file"  -> load a manually-exported GeoJSON/CSV at occurrence_file
+  #                    instead (e.g. the official Info Flora point export later).
+  source: "gbif"
+  species: "Trachycarpus fortunei"
+  gbif_taxon_key: 2739071    # resolved from the species name; pin it for reproducibility
+  gbif_country: "CH"         # restrict the GBIF query to Switzerland
+  # Used only when source == "file":
+  occurrence_file: "data/raw/infoflora_trachycarpus.geojson"
+  # how large to make each point's label footprint (metres) when rasterizing
+  crown_radius_m: 1.5
+  # labeling-assist sheet (script 05)
+  assist_max: 60             # max candidate cards to render
+  assist_window_m: 24        # ortho crop size (m) per card
+
+paths:
+  raw_dir: "data/raw"
+  interim_dir: "data/interim"
+  processed_dir: "data/processed"
+
+# Reproducibility
+seed: 42

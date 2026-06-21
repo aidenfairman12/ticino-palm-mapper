@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.env
+
+# virtual environments
+.venv/
+venv/
+env/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# data is large / licensed — don't commit it
+data/raw/*
+data/interim/*
+data/processed/*
+!data/**/.gitkeep
+# model checkpoints
+*.pt
+*.ckpt

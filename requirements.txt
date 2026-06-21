@@ -1,0 +1,30 @@
+# Core geospatial
+rasterio
+rioxarray
+geopandas
+shapely
+pyproj
+fiona
+
+# Arrays / science
+numpy
+pandas
+xarray
+scikit-image
+scikit-learn
+matplotlib
+
+# Utils
+pyyaml
+tqdm
+requests
+
+# Deep learning — install the CUDA build matching your HPC drivers
+torch
+torchvision
+timm
+lightning
+
+# Optional
+earthengine-api
+pycocotools

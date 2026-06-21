@@ -1,0 +1,35 @@
+name: ticino-palm
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  # --- geospatial I/O ---
+  - rasterio
+  - rioxarray
+  - geopandas
+  - shapely
+  - pyproj
+  - fiona
+  - gdal
+  # --- arrays / science ---
+  - numpy
+  - pandas
+  - xarray
+  - scikit-image
+  - scikit-learn
+  - matplotlib
+  # --- utils ---
+  - pyyaml
+  - tqdm
+  - requests
+  - pip
+  - pip:
+      # deep learning (install the CUDA build matching your HPC's drivers)
+      - torch
+      - torchvision
+      - timm                 # backbones incl. DINOv2 etc.
+      - lightning            # optional training loop scaffolding
+      # geo foundation models / earth engine (optional, wire up as needed)
+      - earthengine-api      # if going the GEE export route
+      # labeling/eval helpers
+      - pycocotools
