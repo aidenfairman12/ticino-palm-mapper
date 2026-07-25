@@ -34,7 +34,9 @@ ticino-palm-mapper/
 │   ├── 02_align_labels.py      # rasterize/align points onto the tile grid
 │   ├── 03_build_feature_stack.py # add co-registered LiDAR CHM -> [R,G,B,CHM] stacks
 │   ├── 04_fetch_temporal.py    # fetch multiple vintages (2018/2021/2024), aligned
-│   ├── 05_labeling_assist.py   # HTML review sheet: crop + GBIF + Street View links
+│   ├── 05_labeling_assist.py   # HTML review sheet: crop(s) + GBIF + Street View links
+│   ├── 06_prioritize_labels.py # rank points by road proximity (OSM) + NIR coverage
+│   ├── 07_build_nir_stack.py   # add co-registered NIR+NDVI -> [NIR,R,G,B,NDVI,CHM]
 │   └── check_swissimage_rs.py  # (utility) inspect delivered SWISSIMAGE RS tiles
 ├── reports/                    # slide decks / write-ups (src/ holds the build tooling)
 ├── src/data/swisstopo.py       # shared STAC fetch / tiling / co-registration helpers
