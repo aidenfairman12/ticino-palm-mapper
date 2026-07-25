@@ -1,0 +1,13 @@
+{
+"type": "FeatureCollection",
+"name": "lugano_example_confirmed_palms",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::2056" } },
+"features": [
+{ "type": "Feature", "properties": { "id": "card2", "x": 2718317.5778685929, "y": 1115232.2132476456, "note": "vineyard, 3 palms, unoccluded" }, "geometry": { "type": "Point", "coordinates": [ 2718317.57786859292537, 1115232.213247645646334 ] } },
+{ "type": "Feature", "properties": { "id": "card3", "x": 2718270.0417517349, "y": 1115218.2203831375, "note": "one side occluded, other not" }, "geometry": { "type": "Point", "coordinates": [ 2718270.041751734912395, 1115218.220383137464523 ] } },
+{ "type": "Feature", "properties": { "id": "card5a", "x": 2718221.2822015649, "y": 1115175.8847721256, "note": "palms" }, "geometry": { "type": "Point", "coordinates": [ 2718221.282201564870775, 1115175.884772125631571 ] } },
+{ "type": "Feature", "properties": { "id": "card5b", "x": 2718180.1240881821, "y": 1115148.0965516127, "note": "further up road" }, "geometry": { "type": "Point", "coordinates": [ 2718180.124088182114065, 1115148.096551612718031 ] } },
+{ "type": "Feature", "properties": { "id": "card10", "x": 2717893.7808706644, "y": 1115068.7883970023, "note": "palm" }, "geometry": { "type": "Point", "coordinates": [ 2717893.780870664399117, 1115068.78839700226672 ] } },
+{ "type": "Feature", "properties": { "id": "card49", "x": 2718162.9936630605, "y": 1115138.1558009274, "note": "palm" }, "geometry": { "type": "Point", "coordinates": [ 2718162.993663060478866, 1115138.155800927430391 ] } }
+]
+}

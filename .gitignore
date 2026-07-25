@@ -22,6 +22,14 @@ data/raw/*
 data/interim/*
 data/processed/*
 !data/**/.gitkeep
+# EXCEPTION: hand-verified ground truth is irreplaceable analyst work, not
+# regenerable/licensed bulk data — track it like code. A directory excluded
+# above is pruned during traversal, so it must be un-ignored explicitly
+# before per-file exceptions inside it will be honoured.
+!data/interim/labels/
+data/interim/labels/*
+!data/interim/labels/*_hand_verified.csv
+!data/interim/labels/*_confirmed_palms.geojson
 # model checkpoints
 *.pt
 *.ckpt
