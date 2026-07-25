@@ -28,6 +28,7 @@ imagery:
   tile_size_px: 1024         # model-tile size to cut the 1 km² COGs into
   tile_overlap_px: 128       # overlap so palms on tile borders aren't lost
   max_tiles: 50              # safety cap while experimenting (null/remove = no cap)
+  rs_date: "20210324"        # delivered RS acquisition date to use (leaf-off; script 07)
 
 labels:
   # source: "gbif"  -> fetch occurrence points directly from the GBIF API (no
@@ -45,6 +46,9 @@ labels:
   # labeling-assist sheet (script 05)
   assist_max: 60             # max candidate cards to render
   assist_window_m: 24        # ortho crop size (m) per card
+  # candidate prioritization (script 06)
+  near_road_m: 25             # distance (m) to nearest OSM road counted as "Street-View-likely"
+  rs_dir: "data/raw/swissimage_rs/lugano_delivery_2026-07"  # delivered NIR tiles
 
 paths:
   raw_dir: "data/raw"
