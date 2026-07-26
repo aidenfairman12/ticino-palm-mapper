@@ -1,0 +1,10 @@
+{
+"type": "FeatureCollection",
+"name": "lugano_batch4_satellite_confirmed_palms",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::2056" } },
+"features": [
+{ "type": "Feature", "properties": { "id": "batch4_r1", "x": 2720231.5614099638, "y": 1115320.5649414323, "lat": 46.178620221967364, "lon": 8.9957239872051868, "note": "3 trunks within ~30cm of each other, produces ONE merged canopy", "rs_dates_available": "20210811,20220715,20240821", "source": "satellite_landmark_match", "ndvi_near_v2": 0.18, "ndvi_bg_v2": 0.14, "ndvi_contrast_v2": 0.04, "ndvi_signal_v2": "weak" }, "geometry": { "type": "Point", "coordinates": [ 2720231.561409963760525, 1115320.564941432327032 ] } },
+{ "type": "Feature", "properties": { "id": "batch4_r2", "x": 2720254.3510721466, "y": 1115307.4402219928, "lat": 46.178498111268674, "lon": 8.996015677421811, "note": "", "rs_dates_available": "20210811,20220715,20240821", "source": "satellite_landmark_match", "ndvi_near_v2": 0.46, "ndvi_bg_v2": 0.27, "ndvi_contrast_v2": 0.2, "ndvi_signal_v2": "distinct" }, "geometry": { "type": "Point", "coordinates": [ 2720254.351072146557271, 1115307.440221992786974 ] } },
+{ "type": "Feature", "properties": { "id": "batch4_r3", "x": 2720255.0968939085, "y": 1115309.0037585145, "lat": 46.178512040259406, "lon": 8.9960257357051425, "note": "", "rs_dates_available": "20210811,20220715,20240821", "source": "satellite_landmark_match", "ndvi_near_v2": 0.33, "ndvi_bg_v2": 0.32, "ndvi_contrast_v2": 0.01, "ndvi_signal_v2": "none" }, "geometry": { "type": "Point", "coordinates": [ 2720255.096893908455968, 1115309.003758514532819 ] } }
+]
+}
