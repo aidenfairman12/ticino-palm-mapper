@@ -1,33 +1,3 @@
-"""
-PyTorch Dataset over the Phase 0 feature stacks.
-
-STUBBED ON PURPOSE — this file is yours to implement. Every function below has
-a docstring describing what it needs to do, its expected inputs/outputs, and
-relevant context from Phase 0. No tensor logic is filled in.
-
-Inputs available on disk (see data/processed/lugano_example/):
-  - feature_stack/*_rgbchm.tif      4 bands float32 [R, G, B, CHM],   1024x1024
-  - feature_stack_rs/*_nirchm.tif   6 bands float32 [NIR,R,G,B,NDVI,CHM], 1024x1024
-    (NIR/R/G/B here are RS-native, NOT the same acquisition as feature_stack's
-    R/G/B — see 07_build_nir_stack.py's docstring before mixing the two)
-  - <aoi>/*_mask.npy                weak positive masks, rasterized from GBIF
-    points (02_align_labels.py) — presence-only, NOT pixel-accurate. Fine for
-    pretraining/coarse supervision, NOT for evaluation.
-  - data/interim/labels/lugano_MASTER_confirmed_palms.geojson
-    39 hand-verified points (21 distinct/5 weak/13 none NDVI signal), the
-    only real evaluation-grade ground truth. Small — treat as a sanity-check
-    set, not a statistically powered test set.
-
-Design decisions already made this session, worth keeping in mind:
-  - Task formulation: density/counting favoured over precise instance
-    detection (crowns run 20-30px at 10cm; adjacent palms merge; positional
-    precision on hand-verified points is ~1-4m, comparable to crown size).
-  - Splits MUST be spatially blocked, not randomly shuffled — nearby tiles
-    are correlated (same lighting/imagery/palm clusters), a random split
-    leaks information and inflates validation metrics.
-  - Channel scales differ wildly (R/G/B in ~0-255, CHM in metres ~0-40,
-    NDVI in [-1,1]) — normalize per-channel, not globally.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,16 +6,20 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import scipy
+from scipy import ndimage
 
 import rasterio
 from rasterio import Affine
 from rasterio.crs import CRS
+from rasterio.transform import array_bounds, rowcol
+
 
 from shapely.geometry import box
 from collections import defaultdict
 import geopandas as gpd
 
-from config import PROJECT_CRS
+from .config import PROJECT_CRS
 
 
 
@@ -61,22 +35,33 @@ class ChannelStats:
     std: np.ndarray
 
 
-def compute_channel_stats(tile_paths: list[Path]) -> ChannelStats:
-    """Compute per-channel mean/std across a set of tiles, for normalization.
-
-    Should stream through `tile_paths` (don't load them all into memory at
-    once — these are 1024x1024xC float32, several MB each) and accumulate
-    per-channel statistics.
-
-    Decide: compute over the TRAINING split only (standard practice — stats
-    from val/test tiles shouldn't leak into normalization), or over everything?
-
-    Returns
-    -------
-    ChannelStats with .mean and .std arrays of shape (C,).
+def compute_channel_stats(train_paths: list[Path]) -> ChannelStats:
+    """Compute per-channel mean/std across a set of tiles, for normalization using Welford's algorithm
+    so each tile only needs to be loaded once.
     """
-    raise NotImplementedError
+    n_a = 0
+    mean_a = None
+    M2_a = None
+    
+    for path in train_paths:
+        arr, _, _ = load_tile(path)
+        if mean_a is None:
+            mean_a = np.zeros(arr.shape[0])
+            M2_a = np.zeros(arr.shape[0])
+            
+        n_b = arr.shape[1] * arr.shape[2]
+        mean_b = arr.mean(axis=(1,2))
+        M2_b = arr.var(axis=(1,2))
+        
+        n_ab = n_a + n_b
+        delta = mean_b - mean_a
+        mean_a = mean_a + delta + n_b / n_ab
+        M2_a = M2_a + M2_b + delta**2 * n_a + n_b / n_ab
+        n_a = n_ab
 
+    std = np.sqrt(M2_a / n_a)
+    
+    return ChannelStats(mean_a, std)
 
 def load_tile(path: Path) -> tuple[np.ndarray, Affine, CRS] :
     """Read one feature-stack GeoTIFF into a (C, H, W) float32 array, also loads tile's 
@@ -96,15 +81,16 @@ def load_tile(path: Path) -> tuple[np.ndarray, Affine, CRS] :
 
 def normalize(array: np.ndarray, stats: ChannelStats) -> np.ndarray:
     """Apply per-channel normalization to a (C, H, W) array.
-
-    array[c] = (array[c] - stats.mean[c]) / stats.std[c], broadcasting
-    correctly over the (H, W) spatial dims. Watch for divide-by-zero if any
-    channel has zero variance in a degenerate case.
     """
-    raise NotImplementedError
+    C = array.shape[0]
+    mean = stats.mean.reshape((C,1,1))
+    std = stats.std.reshape((C,1,1))
+    
+    
+    return (array - mean) / (std + 1e-8)
 
 
-def load_confirmed_points(geojson_path: Path):
+def load_confirmed_points(geojson_path: Path) -> gpd.GeoDataFrame:
     """Load the hand-verified ground-truth points for evaluation.
 
     Returns a GeoDataFrame (geopandas) in EPSG:2056, or convert to whatever
@@ -113,48 +99,37 @@ def load_confirmed_points(geojson_path: Path):
     batch_file. Remember: 13/39 are "none" — decide whether "none" points
     count as confirmed-negative evaluation examples or get excluded.
     """
-    raise NotImplementedError
+    gdf = gpd.read_file(geojson_path)
+    
+    
+    return gdf
 
 
 def points_to_density_target(
     points, tile_transform, tile_shape: tuple[int, int], sigma_px: float
 ) -> np.ndarray:
-    """Rasterize point locations into a density map target for one tile.
-
-    Typical approach: place a delta/1 at each point's pixel location (via
-    the tile's affine transform, rowcol()), then Gaussian-blur (scipy or
-    skimage) with sigma_px so the target is a smooth density map whose
-    integral over the tile approximates the palm count. This is the
-    standard crowd-counting-style target — matches the density/counting
-    task formulation.
-
-    Only rasterize points that actually fall within this tile's bounds.
-
-    Returns
-    -------
-    (H, W) float32 array.
+    """Creates density map from points using gaussian filter.
     """
-    raise NotImplementedError
+    H, W = tile_shape[0], tile_shape[1]
+    left, bottom, right, top = array_bounds(H, W, tile_transform)
+    mask = points.geometry.within(box(left,bottom,right, top))
 
+    tile_points = points[mask]
+    rows, cols = rowcol(tile_transform, tile_points.geometry.x, tile_points.geometry.y)
+    
+    arr = np.zeros((H,W))
+    arr[rows,cols] = 1
+    
+    arr = scipy.ndimage.gaussian_filter(arr, sigma=sigma_px)
+    
+    return arr
 
 def spatial_split(
     tile_paths: list[Path], val_frac: float, test_frac: float, block_size_m: float, seed: int
 ) -> tuple[list[Path], list[Path], list[Path]]:
-    """Split tiles into train/val/test by SPATIAL block, not randomly.
-
-    Why: tiles that are geographically close are correlated (same lighting
-    conditions, same imagery date, may share/straddle the same palm cluster).
-    A random shuffle leaks that correlation across the split and inflates
-    validation/test metrics — this was flagged explicitly for Phase 4's
-    spatial modelling in the project proposal, and applies here too.
-
-    One approach: bin tile centroids into `block_size_m` grid cells, assign
-    whole cells (not individual tiles) to train/val/test so no two tiles from
-    the same cell end up in different splits.
-
-    Returns
-    -------
-    (train_paths, val_paths, test_paths)
+    """Split tiles into train/val/test by SPATIAL block, not randomly. Function computes a centroid
+    for each tile, and puts them in a coarse grid. tiles who belong to the same cell in this coarse grid
+    are not used in seperate splits
     """
     coordMap = {}
     
@@ -178,7 +153,7 @@ def spatial_split(
     cells = list(cellMap.keys())
     rng = np.random.default_rng(seed)
 
-    shuffled_indices = rng.permutation(cells)
+    shuffled_indices = rng.permutation(len(cells))
     shuffled_cells = [cells[i] for i in shuffled_indices]
     
     n = len(shuffled_cells)
@@ -194,19 +169,31 @@ def spatial_split(
     test_paths = [p for cell in test_cells for p in cellMap[cell]]
     
     return train_paths, val_paths, test_paths
+
+def get_cells(paths, block_size_m):
+    cells = set()
+    for p in paths:
+        with rasterio.open(p) as src:
+            coords = src.bounds
+        centroid = box(*coords).centroid
+        cell = (int(centroid.x // block_size_m), int(centroid.y // block_size_m))
+        cells.add(cell)
+    return cells
     
 def random_crop(
     image: np.ndarray, target: np.ndarray, crop_size: int, rng: np.random.Generator
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Randomly crop a (crop_size, crop_size) window from a tile + its target.
-
-    image is (C, H, W), target is (H, W) — crop both at the SAME offset so
-    they stay aligned. Useful for training-time augmentation; at 1024x1024
-    per tile you'll likely want a smaller crop per training step (decide the
-    size based on your model's expected input and available compute).
+    """Crops the image and density map to the same size.
     """
-    raise NotImplementedError
-
+    H, W = target.shape
+    
+    row_offset = rng.integers(0, H - crop_size, endpoint=True)
+    col_offset = rng.integers(0, W - crop_size, endpoint=True)
+    
+    image_crop = image[:, row_offset: row_offset + crop_size, col_offset:col_offset + crop_size]
+    target_crop = target[row_offset: row_offset + crop_size, col_offset: col_offset + crop_size]
+    
+    return image_crop, target_crop
 
 class PalmTileDataset(Dataset):
     """Dataset over feature-stack tiles + density targets.
@@ -257,4 +244,29 @@ if __name__ == "__main__":
     #   print(y.shape, y.dtype, y.sum().item())  # sum ~ implied palm count
     #
     # Get this boring plumbing verified correct before touching a model.
-    spatial_split(["data/processed/lugano_example/feature_stack/lugano_example_2024_c000_r000_rgbchm.tif"], .15, .15, .2, 12)
+    tile_dir = Path("data/processed/lugano_example/feature_stack")
+    tile_paths = list(tile_dir.glob("*_rgbchm.tif"))
+    stats = compute_channel_stats(tile_paths)
+    #print(stats.mean, stats.std)
+    
+    some_path = tile_paths[0]
+    #arr, _, _ = load_tile(some_path)    
+    #normed = normalize(arr, stats)
+    #print(normed.min(), normed.max(), normed.mean(axis=(1,2)))
+    
+    #geojson = "data/interim/labels/lugano_MASTER_confirmed_palms.geojson"
+    #load_confirmed_points(geojson)
+    
+    points = load_confirmed_points(Path("data/interim/labels/lugano_MASTER_confirmed_palms.geojson"))
+
+    tile_dir = Path("data/processed/lugano_example/feature_stack")
+    for tile_path in tile_dir.glob("*_rgbchm.tif"):
+        arr, transform, crs = load_tile(tile_path)
+        tile_shape = arr.shape[1:]  # (H, W) — drop the channel dim
+        target = points_to_density_target(points, transform, tile_shape, sigma_px=10)
+        if target.sum() > 0:
+            print(f"found points in: {tile_path.name}")
+            print(f"target shape: {target.shape}, sum: {target.sum():.2f}, max: {target.max():.4f}")
+            break
+    else:
+        print("no tile in this AOI contained a confirmed point")
