@@ -11,7 +11,7 @@
 #SBATCH --output=logs/palm-ssl-%j.out
 #SBATCH --error=logs/palm-ssl-%j.err
 
-# Run from the repo root: sbatch train_ssl.sbatch
+# Run from the repo root: sbatch slurm/train_ssl.sbatch
 # Assumes ticino-palm.sif has already been built once via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
 mkdir -p logs checkpoints
