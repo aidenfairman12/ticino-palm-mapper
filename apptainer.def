@@ -1,0 +1,46 @@
+Bootstrap: docker
+From: condaforge/miniforge3:latest
+
+%files
+    environment.yml /opt/environment.yml
+
+%post
+    # Build the geospatial + ML env from environment.yml via conda-forge —
+    # rasterio/geopandas/fiona/gdal are notoriously painful to get right via
+    # plain pip due to system-level GDAL/GEOS/PROJ dependencies; conda-forge
+    # handles that binary compatibility for us, same as this project's local
+    # dev setup (see environment.yml).
+    mamba env create -f /opt/environment.yml
+
+    # environment.yml installs a generic `torch` via pip, which is often
+    # CPU-only or the wrong CUDA build for THIS specific HPC's GPU driver.
+    # Check the cluster's CUDA version (module avail cuda / nvidia-smi on a
+    # GPU node) and replace the line below with the matching index-url from
+    # https://pytorch.org's install selector before building for real, e.g.
+    # for CUDA 12.1:
+    #   mamba run -n ticino-palm pip install torch torchvision \
+    #     --index-url https://download.pytorch.org/whl/cu121
+    mamba run -n ticino-palm pip install torch torchvision \
+        --index-url https://download.pytorch.org/whl/<FILL IN — e.g. cu121>
+
+    mamba clean -afy
+
+%environment
+    export PATH=/opt/conda/envs/ticino-palm/bin:$PATH
+
+%runscript
+    exec python "$@"
+
+%help
+    Environment container for ticino-palm-mapper (SSL pretraining +
+    downstream fine-tuning). Does NOT bundle the repo code or data — bind-mount
+    those at runtime so the container doesn't need rebuilding when code changes:
+
+        apptainer build ticino-palm.sif apptainer.def
+        apptainer exec --nv \
+            --bind $HOME/ticino-palm-mapper:/workspace \
+            ticino-palm.sif \
+            python -m src.training.pretrain_ssl
+
+    --nv is required to expose the host's NVIDIA GPU/driver inside the
+    container — omitting it silently falls back to CPU.
