@@ -240,7 +240,7 @@ def main() -> None:
 
     base_lr = 1.5e-4
     weight_decay = 0.05
-    total_epochs = 20
+    total_epochs = 60
     warmup_epochs = total_epochs * 0.05
     log_interval = 5
     checkpoint_dir = Path("checkpoints")

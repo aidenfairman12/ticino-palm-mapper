@@ -20,8 +20,8 @@ From: condaforge/miniforge3:latest
     # for CUDA 12.1:
     #   mamba run -n ticino-palm pip install torch torchvision \
     #     --index-url https://download.pytorch.org/whl/cu121
-    mamba run -n ticino-palm pip install torch torchvision \
-        --index-url https://download.pytorch.org/whl/<FILL IN — e.g. cu121>
+    mamba run -n ticino-palm pip install --force-reinstall torch torchvision \
+        --index-url https://download.pytorch.org/whl/cu124
 
     mamba clean -afy
 

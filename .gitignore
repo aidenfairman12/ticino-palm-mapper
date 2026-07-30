@@ -33,3 +33,7 @@ data/interim/labels/*
 # model checkpoints
 *.pt
 *.ckpt
+
+# built containers / job logs
+*.sif
+logs/
