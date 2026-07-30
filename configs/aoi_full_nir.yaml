@@ -1,0 +1,55 @@
+# Area-of-interest and run configuration — FULL NIR FOOTPRINT.
+#
+# aoi_example.yaml's tiny 500x500m box was a sanity-check convenience for the
+# first pipeline run, not a real dataset. This config instead covers the
+# ENTIRE delivered SWISSIMAGE RS (NIR) footprint — 25 strips, ~62 km^2 — since
+# NIR/CHM fusion is central to the approach and RGB-only imagery outside this
+# footprint isn't usable for that. Bounds were read directly off the 25
+# delivered RS tiles (see scripts/09_export_nir_extent_kml.py).
+#
+# SCALE: ~5,900 tiles at 1024px/0.10m. Confirmed ~1TB+ free on the HPC
+# (home + scratch combined) before running this — do not run against this
+# config on a machine without that headroom. Run on the HPC, not locally.
+
+aoi:
+  name: "lugano_full_nir"
+  # Bounding box in EPSG:2056 (CH1903+ / LV95), in metres.
+  # Full extent of the 25 delivered SWISSIMAGE RS strips (labels.rs_dir below).
+  # NOTE: strips don't tile contiguously — there are real gaps inside this
+  # bounding rectangle. Tiles falling in a gap will still get a 4-channel
+  # [R,G,B,CHM] stack (script 03) but NOT a 6-channel NIR stack (script 07
+  # naturally skips tiles with no NIR coverage) — that's expected, not a bug.
+  # Order: [xmin, ymin, xmax, ymax]
+  bbox_lv95: [2715098, 1111000, 2721828, 1120181]
+  crs: "EPSG:2056"
+
+imagery:
+  product: "swissimage-10cm"
+  year: 2024
+  years: [2018, 2021, 2024]
+  source: "stac"
+  bands: ["R", "G", "B"]
+  res_m: 0.10
+  tile_size_px: 1024
+  tile_overlap_px: 128
+  max_tiles: null            # no cap — this run is deliberately the full footprint
+  rs_date: "20210324"        # delivered RS acquisition date to use (leaf-off; script 07)
+
+labels:
+  source: "gbif"
+  species: "Trachycarpus fortunei"
+  gbif_taxon_key: 2739071
+  gbif_country: "CH"
+  occurrence_file: "data/raw/infoflora_trachycarpus.geojson"
+  crown_radius_m: 1.5
+  assist_max: 60
+  assist_window_m: 24
+  near_road_m: 25
+  rs_dir: "data/raw/swissimage_rs/lugano_delivery_2026-07"  # delivered NIR tiles
+
+paths:
+  raw_dir: "data/raw"
+  interim_dir: "data/interim"
+  processed_dir: "data/processed"
+
+seed: 42
