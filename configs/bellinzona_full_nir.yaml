@@ -12,7 +12,7 @@
 # config on a machine without that headroom. Run on the HPC, not locally.
 
 aoi:
-  name: "lugano_full_nir"
+  name: "bellinzona_full_nir"
   # Bounding box in EPSG:2056 (CH1903+ / LV95), in metres.
   # Full extent of the 25 delivered SWISSIMAGE RS strips (labels.rs_dir below).
   # NOTE: strips don't tile contiguously — there are real gaps inside this
@@ -33,7 +33,13 @@ imagery:
   tile_size_px: 1024
   tile_overlap_px: 128
   max_tiles: null            # no cap — this run is deliberately the full footprint
-  rs_date: "20210324"        # delivered RS acquisition date to use (leaf-off; script 07)
+  rs_date: "20210324"        # default NIR date for script 07 — leaf-off, best NDVI
+                              # contrast. A second, more recent date (matching newer
+                              # labels' vintage) gets built separately via
+                              # `07_build_nir_stack.py --rs-date 20240810` (or
+                              # whichever 2024 date), overriding this without editing
+                              # the config — each run writes its own
+                              # feature_stack_rs_<date>/ dir, so both coexist.
 
 labels:
   source: "gbif"

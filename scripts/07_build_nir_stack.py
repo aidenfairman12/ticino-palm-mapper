@@ -25,20 +25,26 @@ Config:
   imagery.rs_date    - which acquisition date to use (default: the leaf-off
                         date, since evergreen/deciduous contrast is the reason
                         NIR was requested). Falls back to whatever's available
-                        if unset.
+                        if unset. Override per-run with --rs-date without
+                        editing the config, e.g. to build a second, more
+                        recent-dated stack for temporal cross-checking against
+                        newer labels — output lands in a date-specific
+                        feature_stack_rs_<date>/ dir either way, so multiple
+                        runs against the same config don't clobber each other.
 
 STATUS: implemented and tested against the lugano_example AOI (36/36 tiles
 had coverage from the 2021-03-24 leaf-off delivery).
 """
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.data import swisstopo as st  # noqa: E402
-from src.data.config import ensure_dir, load_config, parse_args  # noqa: E402
+from src.data.config import ensure_dir, load_config  # noqa: E402
 
 RS_TAG = ""  # RS filenames have no fixed resolution tag like the STAC assets; match by date prefix
 
@@ -47,8 +53,22 @@ def rs_hrefs_for_date(rs_dir: Path, date: str) -> list[str]:
     return [str(p) for p in sorted(rs_dir.glob(f"{date}_*.tif"))]
 
 
+def parse_nir_stack_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Add NIR + NDVI to the feature stack where RS coverage exists."
+    )
+    p.add_argument("--config", required=True, help="Path to AOI/run YAML config")
+    p.add_argument(
+        "--rs-date", default=None,
+        help="Override imagery.rs_date from the config — lets you build multiple "
+             "dated stacks (e.g. leaf-off + a recent date) from one config without "
+             "duplicating it. Output goes to a date-specific directory either way.",
+    )
+    return p.parse_args()
+
+
 def main() -> None:
-    args = parse_args("Add NIR + NDVI to the feature stack where RS coverage exists.")
+    args = parse_nir_stack_args()
     cfg = load_config(args.config)
 
     import numpy as np
@@ -57,15 +77,21 @@ def main() -> None:
     aoi = cfg["aoi"]["name"]
     rs_dir = Path(cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/lugano_delivery_2026-07"))
     fs_dir = Path(cfg["paths"]["processed_dir"]) / aoi / "feature_stack"
-    out_dir = ensure_dir(Path(cfg["paths"]["processed_dir"]) / aoi / "feature_stack_rs")
 
     if not rs_dir.exists():
         raise SystemExit(f"RS directory not found: {rs_dir}")
     all_rs = sorted(rs_dir.glob("*.tif"))
     dates_available = sorted({p.name[:8] for p in all_rs})
-    rs_date = str(cfg["imagery"].get("rs_date", dates_available[0] if dates_available else ""))
+    rs_date = args.rs_date or str(cfg["imagery"].get("rs_date", dates_available[0] if dates_available else ""))
     if rs_date not in dates_available:
-        raise SystemExit(f"imagery.rs_date={rs_date!r} not in delivered dates {dates_available}")
+        raise SystemExit(f"rs_date={rs_date!r} not in delivered dates {dates_available}")
+
+    # Date-specific output dir — running this script twice with different dates
+    # (e.g. leaf-off for NDVI contrast + a recent date for temporal alignment
+    # with newer labels) must not silently overwrite the other run's output.
+    out_dir = ensure_dir(
+        Path(cfg["paths"]["processed_dir"]) / aoi / f"feature_stack_rs_{rs_date}"
+    )
 
     hrefs = rs_hrefs_for_date(rs_dir, rs_date)
     print(f"=== NIR stack :: AOI '{aoi}' :: RS date {rs_date} ({len(hrefs)} strips) ===")
