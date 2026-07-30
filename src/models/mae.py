@@ -76,7 +76,7 @@ def random_masking(
             the correct positions.
     """
     B, N, D = x.shape
-    noise = torch.rand(B, N)
+    noise = torch.rand(B, N, device=x.device)
     ids_shuffle = torch.argsort(noise, dim=1)
 
     N_keep = int((1 - mask_ratio) * N)
@@ -84,7 +84,7 @@ def random_masking(
     ids_keep_expanded = ids_keep.unsqueeze(-1).expand(-1, -1, D)
     x_masked = torch.gather(x, 1, ids_keep_expanded)
 
-    mask = torch.ones(B, N)
+    mask = torch.ones(B, N, device=x.device)
     mask[:, :N_keep] = 0
     ids_restore = torch.argsort(ids_shuffle, dim=1)
     mask = torch.gather(mask, 1, ids_restore)
