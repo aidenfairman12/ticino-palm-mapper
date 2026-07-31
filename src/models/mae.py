@@ -193,6 +193,28 @@ class MaskedAutoencoder(nn.Module):
 
         return x, mask, ids_restore
 
+    def encode_full(self, x: torch.Tensor) -> torch.Tensor:
+        """Encode a crop with NO masking — every patch stays visible.
+        """
+        x = self.backbone.patch_embed(x)
+        B = x.shape[0]
+        
+        patch_pos_embed = resample_abs_pos_embed(
+            self.backbone.pos_embed[:,1:,:],
+            (self.img_size // self.patch_size, self.img_size // self.patch_size),
+            (37,37),
+            0,
+        )
+        
+        x = x + patch_pos_embed
+        cls_token = self.backbone.cls_token.expand(B, -1, -1) + self.backbone.pos_embed[:,:1,:]
+        x = torch.cat([cls_token, x], dim=1)
+        
+        x = self.backbone.blocks(x)
+        x = self.backbone.norm(x)
+        
+        return x
+
     def forward_decoder(self, x: torch.Tensor, ids_restore: torch.Tensor) -> torch.Tensor:
         """Reinsert mask tokens at their true positions and decode to pixel
         predictions for every patch (both visible and masked).
