@@ -41,8 +41,27 @@ from src.data.ssl_dataset import PalmSSLDataset
 from src.models.mae import MaskedAutoencoder, adapt_patch_embed
 
 
+def glob_tiles(tile_dirs: list[Path], in_chans: int) -> list[Path]:
+    """Glob tiles from one or more directories, combined into one list.
+
+    Suffix depends on channel count: 4ch feature_stack dirs write
+    *_rgbchm.tif, 6ch feature_stack_rs_<date> dirs write *_nirchm.tif (see
+    03_build_feature_stack.py / 07_build_nir_stack.py). Multiple 6ch dirs
+    (different NIR dates) are combined into one training pool — SSL
+    pretraining doesn't care which date a tile came from, and a location
+    covered by more than one date just becomes extra distinct crops rather
+    than a conflict.
+    """
+    suffix = "*_rgbchm.tif" if in_chans == 4 else "*_nirchm.tif"
+    tile_paths = []
+    for d in tile_dirs:
+        tile_paths.extend(sorted(d.glob(suffix)))
+    return tile_paths
+
+
 def build_dataloaders(
-    tile_dir: Path,
+    tile_dirs: list[Path],
+    in_chans: int,
     stats: ChannelStats,
     crop_size: int,
     batch_size: int,
@@ -53,7 +72,7 @@ def build_dataloaders(
     seed: int,
 ) -> tuple[DataLoader, DataLoader]:
     """Build train/val DataLoaders over PalmSSLDataset."""
-    tile_paths = list(tile_dir.glob("*_rgbchm.tif"))
+    tile_paths = glob_tiles(tile_dirs, in_chans)
     train, val, _ = spatial_split(tile_paths, val_frac, test_frac, block_size_m, seed)
 
     train_data = PalmSSLDataset(train, stats, crop_size)
@@ -215,12 +234,15 @@ def save_checkpoint(
 def parse_pretrain_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MAE-style SSL pretraining over PalmSSLDataset.")
     p.add_argument(
-        "--tile-dir", type=Path, default=Path("data/processed/lugano_example/feature_stack"),
-        help="Directory of *_rgbchm.tif (4ch) or *_nirchm.tif (6ch) tiles to train on.",
+        "--tile-dirs", type=Path, nargs="+",
+        default=[Path("data/processed/lugano_example/feature_stack")],
+        help="One or more directories of *_rgbchm.tif (4ch) or *_nirchm.tif (6ch) "
+             "tiles to train on. Pass multiple space-separated paths to combine several "
+             "NIR-date stacks into one training pool (all must share the same in_chans).",
     )
     p.add_argument(
         "--in-chans", type=int, default=4, choices=[4, 6],
-        help="4 for [R,G,B,CHM] tiles, 6 for [NIR,R,G,B,NDVI,CHM] tiles — must match --tile-dir's contents.",
+        help="4 for [R,G,B,CHM] tiles, 6 for [NIR,R,G,B,NDVI,CHM] tiles — must match --tile-dirs' contents.",
     )
     p.add_argument("--checkpoint-dir", type=Path, default=Path("checkpoints"))
     p.add_argument("--total-epochs", type=int, default=60)
@@ -238,7 +260,7 @@ def main() -> None:
     else:
         device = torch.device("cpu")
 
-    tile_dir = args.tile_dir
+    tile_dirs = args.tile_dirs
     backbone_name = "vit_small_patch14_dinov2.lvd142m"
     in_chans = args.in_chans
     img_size = 224
@@ -265,13 +287,13 @@ def main() -> None:
     checkpoint_dir = args.checkpoint_dir
     checkpoint_every = 5
 
-    tile_paths = list(tile_dir.glob("*_rgbchm.tif"))
+    tile_paths = glob_tiles(tile_dirs, in_chans)
     train_paths, _, _ = spatial_split(tile_paths, val_frac, test_frac, block_size_m, seed)
     stats = compute_channel_stats(train_paths)
     lr = base_lr * batch_size / 256
 
     train_loader, val_loader = build_dataloaders(
-        tile_dir, stats, crop_size, batch_size, num_workers, val_frac, test_frac, block_size_m, seed
+        tile_dirs, in_chans, stats, crop_size, batch_size, num_workers, val_frac, test_frac, block_size_m, seed
     )
 
     model = build_model(
