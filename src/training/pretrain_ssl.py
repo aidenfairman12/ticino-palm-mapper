@@ -245,7 +245,17 @@ def parse_pretrain_args() -> argparse.Namespace:
         help="4 for [R,G,B,CHM] tiles, 6 for [NIR,R,G,B,NDVI,CHM] tiles — must match --tile-dirs' contents.",
     )
     p.add_argument("--checkpoint-dir", type=Path, default=Path("checkpoints"))
-    p.add_argument("--total-epochs", type=int, default=60)
+    p.add_argument(
+        "--total-epochs", type=int, default=150,
+        help="LR-schedule horizon (cosine decay is computed relative to this) — pick a "
+             "real, deliberate ceiling, not an arbitrarily large number to lean on "
+             "--patience for. Early stopping is a safety net against overfitting/wasted "
+             "compute before reaching this point, not a substitute for a reasonable guess.",
+    )
+    p.add_argument(
+        "--patience", type=int, default=10,
+        help="Stop early if val_loss hasn't improved for this many consecutive epochs.",
+    )
     p.add_argument("--batch-size", type=int, default=4)
     return p.parse_args()
 
@@ -304,6 +314,9 @@ def main() -> None:
 
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
+    best_val_loss = float("inf")
+    patience_counter = 0
+
     for epoch in range(total_epochs):
         train_loss = train_one_epoch(
             model, train_loader, optimizer, device, epoch, total_epochs, warmup_epochs, base_lr, log_interval
@@ -313,6 +326,19 @@ def main() -> None:
 
         if (epoch + 1) % checkpoint_every == 0:
             save_checkpoint(checkpoint_dir / f"checkpoint_epoch{epoch}.pt", model, optimizer, epoch, stats)
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience_counter = 0
+            save_checkpoint(checkpoint_dir / "checkpoint_best.pt", model, optimizer, epoch, stats)
+        else:
+            patience_counter += 1
+            if patience_counter >= args.patience:
+                print(
+                    f"early stopping at epoch {epoch}: val_loss hasn't improved for "
+                    f"{args.patience} epochs (best={best_val_loss:.4f})"
+                )
+                break
 
 
 if __name__ == "__main__":
