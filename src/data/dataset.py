@@ -51,12 +51,12 @@ def compute_channel_stats(train_paths: list[Path]) -> ChannelStats:
             
         n_b = arr.shape[1] * arr.shape[2]
         mean_b = arr.mean(axis=(1,2))
-        M2_b = arr.var(axis=(1,2))
-        
+        M2_b = arr.var(axis=(1,2)) * n_b
+
         n_ab = n_a + n_b
         delta = mean_b - mean_a
-        mean_a = mean_a + delta + n_b / n_ab
-        M2_a = M2_a + M2_b + delta**2 * n_a + n_b / n_ab
+        mean_a = mean_a + delta * (n_b / n_ab)
+        M2_a = M2_a + M2_b + delta**2 * (n_a * n_b / n_ab)
         n_a = n_ab
 
     std = np.sqrt(M2_a / n_a)
