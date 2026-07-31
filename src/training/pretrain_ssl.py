@@ -28,6 +28,7 @@ Design decisions made for this project:
 """
 from __future__ import annotations
 
+import argparse
 import math
 from pathlib import Path
 
@@ -211,7 +212,25 @@ def save_checkpoint(
     torch.save(checkpoint, f=path)
 
 
+def parse_pretrain_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="MAE-style SSL pretraining over PalmSSLDataset.")
+    p.add_argument(
+        "--tile-dir", type=Path, default=Path("data/processed/lugano_example/feature_stack"),
+        help="Directory of *_rgbchm.tif (4ch) or *_nirchm.tif (6ch) tiles to train on.",
+    )
+    p.add_argument(
+        "--in-chans", type=int, default=4, choices=[4, 6],
+        help="4 for [R,G,B,CHM] tiles, 6 for [NIR,R,G,B,NDVI,CHM] tiles — must match --tile-dir's contents.",
+    )
+    p.add_argument("--checkpoint-dir", type=Path, default=Path("checkpoints"))
+    p.add_argument("--total-epochs", type=int, default=60)
+    p.add_argument("--batch-size", type=int, default=4)
+    return p.parse_args()
+
+
 def main() -> None:
+    args = parse_pretrain_args()
+
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -219,9 +238,9 @@ def main() -> None:
     else:
         device = torch.device("cpu")
 
-    tile_dir = Path("data/processed/lugano_example/feature_stack")
+    tile_dir = args.tile_dir
     backbone_name = "vit_small_patch14_dinov2.lvd142m"
-    in_chans = 4
+    in_chans = args.in_chans
     img_size = 224
     patch_size = 14
     embed_dim = 384
@@ -231,7 +250,7 @@ def main() -> None:
     mask_ratio = 0.75
 
     crop_size = 224
-    batch_size = 4
+    batch_size = args.batch_size
     num_workers = 2
     val_frac = 0.15
     test_frac = 0.15
@@ -240,10 +259,10 @@ def main() -> None:
 
     base_lr = 1.5e-4
     weight_decay = 0.05
-    total_epochs = 60
+    total_epochs = args.total_epochs
     warmup_epochs = total_epochs * 0.05
     log_interval = 5
-    checkpoint_dir = Path("checkpoints")
+    checkpoint_dir = args.checkpoint_dir
     checkpoint_every = 5
 
     tile_paths = list(tile_dir.glob("*_rgbchm.tif"))
