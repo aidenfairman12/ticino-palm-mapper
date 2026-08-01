@@ -144,15 +144,34 @@ def leave_one_tile_out_cv(
     # only the containing directory differs). Grouping by full Path would
     # split one location's multi-date versions across different "folds",
     # leaking the same location into both train and test simultaneously.
-    positive_tiles = {tp.name for tp, label in zip(tile_paths, labels) if label == 1}
+    positive_tiles = sorted({tp.name for tp, label in zip(tile_paths, labels) if label == 1})
+    n_folds = len(positive_tiles)
 
-    for tile_name in positive_tiles:
-      mask = torch.tensor([tp.name == tile_name for tp in tile_paths])
+    # Negatives aren't tied to a specific tile the way positives are, and
+    # in practice almost never happen to share a tile with a positive
+    # point — relying on tile-membership alone leaves every fold's test
+    # set with zero negatives (true_neg always 0), never actually testing
+    # specificity. Instead, split negatives into n_folds roughly-equal
+    # groups up front, one group held out per fold — every negative gets
+    # tested in exactly one fold across the whole CV process, and a fold's
+    # "other" negative groups remain safely usable for that fold's
+    # training (they're just reserved as a DIFFERENT fold's test set,
+    # which doesn't leak anything into this fold's own train/test split).
+    neg_idx = [i for i, label in enumerate(labels) if label == 0]
+    g = torch.Generator().manual_seed(0)
+    shuffled_neg_idx = [neg_idx[i] for i in torch.randperm(len(neg_idx), generator=g).tolist()]
+    neg_groups = [shuffled_neg_idx[i::n_folds] for i in range(n_folds)]
 
-      test_feat = features[mask]
-      train_feat = features[~mask]
+    for tile_name, neg_test_idx in zip(positive_tiles, neg_groups):
+      pos_test_mask = torch.tensor([tp.name == tile_name and lab == 1 for tp, lab in zip(tile_paths, labels)])
+      neg_test_mask = torch.zeros(len(labels), dtype=torch.bool)
+      neg_test_mask[neg_test_idx] = True
 
-      train_lab, test_label = labels[~mask], labels[mask]
+      test_mask = pos_test_mask | neg_test_mask
+      train_mask = ~test_mask
+
+      test_feat, test_label = features[test_mask], labels[test_mask]
+      train_feat, train_lab = features[train_mask], labels[train_mask]
 
       probe = train_probe(train_feat, train_lab, embed_dim, epochs, lr)
 
