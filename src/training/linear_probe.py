@@ -57,7 +57,21 @@ def extract_all_features(
     labels (N,) float32, tile_paths a plain list of N Paths (parallel to
     the tensors, not itself a tensor).
     """
-    raise NotImplementedError
+    model.eval()
+    features, labels, tile_paths = [], [], []
+    
+    for idx, (image, label) in enumerate(dataset):
+      x = image.unsqueeze(0).to(device)
+      with torch.no_grad():
+        encoded = model.encode_full(x)
+      
+      feature = encoded[0,0]
+      features.append(feature)
+      labels.append(label)
+      tile_paths.append(dataset.examples[idx][0])
+      
+    
+    return (torch.stack(features), torch.stack(labels), tile_paths)
 
 
 def train_probe(
