@@ -220,6 +220,7 @@ def save_checkpoint(
     optimizer: torch.optim.Optimizer,
     epoch: int,
     stats: ChannelStats,
+    best_val_loss: float,
 ) -> None:
     """Save model/optimizer state, epoch, and normalization stats to `path`."""
     checkpoint = {
@@ -227,6 +228,7 @@ def save_checkpoint(
         "optimizer_state_dict": optimizer.state_dict(),
         "epoch": epoch,
         "stats": stats,
+        "best_val_loss": best_val_loss,
     }
     torch.save(checkpoint, f=path)
 
@@ -256,7 +258,13 @@ def parse_pretrain_args() -> argparse.Namespace:
         "--patience", type=int, default=10,
         help="Stop early if val_loss hasn't improved for this many consecutive epochs.",
     )
-    p.add_argument("--batch-size", type=int, default=4)
+    p.add_argument("--batch-size", type=int, default=4
+                   )
+    p.add_argument(
+        "--resume-from", type=Path, default=None,
+        help="Path to a checkpoint to resume training from — reuses its stats/model/"
+             "optimizer state and continues at the next epoch, instead of starting fresh.",
+    )    
     return p.parse_args()
 
 
@@ -297,9 +305,19 @@ def main() -> None:
     checkpoint_dir = args.checkpoint_dir
     checkpoint_every = 5
 
-    tile_paths = glob_tiles(tile_dirs, in_chans)
-    train_paths, _, _ = spatial_split(tile_paths, val_frac, test_frac, block_size_m, seed)
-    stats = compute_channel_stats(train_paths)
+    if args.resume_from is not None:
+        checkpoint = torch.load(args.resume_from, map_location=device, weights_only=False)
+        stats = checkpoint["stats"]
+        start_epoch = checkpoint["epoch"] + 1
+        best_val_loss = checkpoint.get("best_val_loss", float("inf"))
+    else:
+        tile_paths = glob_tiles(tile_dirs, in_chans)
+        train_paths, _, _ = spatial_split(tile_paths, val_frac, test_frac, block_size_m, seed)
+        stats = compute_channel_stats(train_paths)
+        start_epoch = 0
+        best_val_loss = float("inf")
+        
+        
     lr = base_lr * batch_size / 256
 
     train_loader, val_loader = build_dataloaders(
@@ -311,13 +329,16 @@ def main() -> None:
         decoder_embed_dim, decoder_depth, decoder_num_heads, mask_ratio, device,
     )
     optimizer = build_optimizer(model, lr, weight_decay)
+    
+    if args.resume_from is not None:
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-    best_val_loss = float("inf")
     patience_counter = 0
 
-    for epoch in range(total_epochs):
+    for epoch in range(start_epoch, total_epochs):
         train_loss = train_one_epoch(
             model, train_loader, optimizer, device, epoch, total_epochs, warmup_epochs, base_lr, log_interval
         )
@@ -325,12 +346,12 @@ def main() -> None:
         print(f"epoch {epoch}: train_loss={train_loss:.4f}, val_loss={val_loss:.4f}")
 
         if (epoch + 1) % checkpoint_every == 0:
-            save_checkpoint(checkpoint_dir / f"checkpoint_epoch{epoch}.pt", model, optimizer, epoch, stats)
+            save_checkpoint(checkpoint_dir / f"checkpoint_epoch{epoch}.pt", model, optimizer, epoch, stats, best_val_loss)
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
-            save_checkpoint(checkpoint_dir / "checkpoint_best.pt", model, optimizer, epoch, stats)
+            save_checkpoint(checkpoint_dir / "checkpoint_best.pt", model, optimizer, epoch, stats, best_val_loss)
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
