@@ -30,6 +30,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import geopandas as gpd
+import pandas as pd
 import timm
 import torch
 import torch.nn as nn
@@ -165,6 +167,13 @@ def parse_probe_args() -> argparse.Namespace:
     p.add_argument("--checkpoint", type=Path, required=True, help="Path to a pretrain_ssl.py checkpoint (e.g. checkpoint_best.pt).")
     p.add_argument("--tile-dirs", type=Path, nargs="+", required=True, help="feature_stack_rs_<date> dir(s) to search for covering tiles — same set (or a superset) of what the checkpoint was trained on.")
     p.add_argument("--confirmed-points", type=Path, required=True, help="Path to the MASTER confirmed-palms GeoJSON.")
+    p.add_argument(
+        "--scouted-points", type=Path, default=None,
+        help="Optional path to a scouted-candidates GeoJSON (e.g. from KML-based satellite "
+             "scouting) — all its points are included as positives alongside the confirmed "
+             "'distinct' set, regardless of confidence tier. Accepts some false positives in "
+             "exchange for meaningfully more positive-tile fold coverage.",
+    )
     p.add_argument("--n-negatives", type=int, default=30)
     p.add_argument("--min-distance-m", type=float, default=20.0)
     p.add_argument("--crop-size", type=int, default=224)
@@ -212,20 +221,29 @@ def main() -> None:
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
 
-    # Positives: "distinct"-signal confirmed points. Negatives: sampled
-    # locations, excluded from being near either a confirmed point OR a
-    # "none"-signal point (already-reviewed-but-inconclusive — a
-    # reasonable stand-in for "don't sample here" alongside the confirmed
-    # positives, without needing a separate raw-GBIF-occurrences file for
-    # this first real run).
+    # Positives: "distinct"-signal confirmed points, plus (if provided) ALL
+    # scouted candidates regardless of confidence tier — accepting a few
+    # likely false positives in exchange for meaningfully more positive-
+    # tile fold coverage than the original 3-tile ground truth allowed.
+    # Negatives: sampled locations, excluded from being near either a
+    # confirmed point OR a "none"-signal point (already-reviewed-but-
+    # inconclusive — a reasonable stand-in for "don't sample here"
+    # alongside the confirmed positives, without needing a separate
+    # raw-GBIF-occurrences file for this first real run).
     points = load_confirmed_points(args.confirmed_points)
     distinct = points[points["ndvi_signal_current"] == "distinct"]
     none_signal = points[points["ndvi_signal_current"] == "none"]
 
+    positive_geoms = distinct.geometry
+    if args.scouted_points is not None:
+        scouted = gpd.read_file(args.scouted_points)
+        positive_geoms = pd.concat([positive_geoms, scouted.geometry], ignore_index=True)
+        print(f"positives: {len(distinct)} confirmed + {len(scouted)} scouted = {len(positive_geoms)} total")
+
     tile_paths = glob_tiles(args.tile_dirs, in_chans)
 
     negatives = sample_negative_points(
-        positive_points=distinct.geometry,
+        positive_points=positive_geoms,
         candidate_points=none_signal.geometry,
         tile_paths=tile_paths,
         n_negatives=args.n_negatives,
@@ -233,7 +251,7 @@ def main() -> None:
         seed=args.seed,
     )
 
-    dataset = PalmProbeDataset(distinct.geometry, negatives, tile_paths, stats, args.crop_size)
+    dataset = PalmProbeDataset(positive_geoms, negatives, tile_paths, stats, args.crop_size)
     print(f"probe dataset: {len(dataset)} examples "
           f"({sum(1 for e in dataset.examples if e[3] == 1.0)} positive, "
           f"{sum(1 for e in dataset.examples if e[3] == 0.0)} negative)")
