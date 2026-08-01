@@ -27,6 +27,7 @@ high-variance, small-sample) read on generalization with this little data.
 """
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import torch
@@ -124,53 +125,71 @@ def leave_one_tile_out_cv(
     """Run leave-one-tile-out CV: for each unique tile that has at least
     one POSITIVE example, hold it out, train on everything else, evaluate
     on the held-out tile's examples, repeat.
-
-    Steps:
-      - call extract_all_features ONCE up front (expensive part, don't
-        repeat it per fold),
-      - find the set of unique tile_paths that have at least one positive
-        (label==1) example among their crops — these are your folds; tiles
-        with only negative examples aren't meaningful holdouts on their own
-        (there's nothing positive to test generalization against),
-      - for each such tile: build a boolean mask splitting features/labels
-        into "this tile" (held out) vs "everything else" (train), call
-        train_probe on the train split, evaluate_probe on the held-out
-        split, record the result,
-      - return a dict keyed by held-out tile path, one entry per fold.
-
-    Note on negatives: since negatives were sampled independently of any
-    specific tile grouping, decide how they get distributed across folds —
-    e.g. all held-out-tile's negatives (if any landed there) go with that
-    fold's test set, everything else's negatives go to train, same
-    tile-membership logic as positives. No special-casing needed if you
-    already have each example's tile_path from extract_all_features.
     """
     
     ret = {}
-    
+
     features, labels, tile_paths = extract_all_features(model, dataset, device)
     embed_dim = features.shape[1]
-    positive_tiles = {tp for tp, label in zip(tile_paths, labels) if label == 1}
-    
-    for tile in positive_tiles:
-      mask = torch.tensor([tp == tile for tp in tile_paths])
-      
+
+    # Fold identity is the tile FILENAME, not the full path — the same
+    # geographic tile shows up as separate files across different
+    # feature_stack_rs_<date> directories (identical filename, since
+    # script 07 derives it from the input RGB tile's name, not rs_date;
+    # only the containing directory differs). Grouping by full Path would
+    # split one location's multi-date versions across different "folds",
+    # leaking the same location into both train and test simultaneously.
+    positive_tiles = {tp.name for tp, label in zip(tile_paths, labels) if label == 1}
+
+    for tile_name in positive_tiles:
+      mask = torch.tensor([tp.name == tile_name for tp in tile_paths])
+
       test_feat = features[mask]
       train_feat = features[~mask]
-      
+
       train_lab, test_label = labels[~mask], labels[mask]
-      
+
       probe = train_probe(train_feat, train_lab, embed_dim, epochs, lr)
 
-      ret[tile] = evaluate_probe(probe, test_feat, test_label)
-      
+      ret[tile_name] = evaluate_probe(probe, test_feat, test_label)
+
     return ret
       
 
 
+def parse_probe_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Leave-one-tile-out linear probe eval of an SSL checkpoint.")
+    p.add_argument("--checkpoint", type=Path, required=True, help="Path to a pretrain_ssl.py checkpoint (e.g. checkpoint_best.pt).")
+    p.add_argument("--tile-dirs", type=Path, nargs="+", required=True, help="feature_stack_rs_<date> dir(s) to search for covering tiles — same set (or a superset) of what the checkpoint was trained on.")
+    p.add_argument("--confirmed-points", type=Path, required=True, help="Path to the MASTER confirmed-palms GeoJSON.")
+    p.add_argument("--n-negatives", type=int, default=30)
+    p.add_argument("--min-distance-m", type=float, default=20.0)
+    p.add_argument("--crop-size", type=int, default=224)
+    p.add_argument("--epochs", type=int, default=200)
+    p.add_argument("--lr", type=float, default=0.01)
+    p.add_argument("--seed", type=int, default=42)
+    return p.parse_args()
+
+
+def main() -> None:
+    """Wire everything together: load the checkpoint + rebuild the model
+    (same architecture-config-then-load_state_dict pattern as mae.py's
+    __main__ and the reconstruction-quality notebook — the config values
+    MUST match whatever the checkpoint was actually trained with, or
+    load_state_dict will fail on a shape mismatch), build the confirmed
+    positive points + sampled negatives + PalmProbeDataset, run
+    leave_one_tile_out_cv, and print a per-fold + aggregate summary.
+
+    Device selection: same cuda -> mps -> cpu fallback as pretrain_ssl.py.
+
+    Aggregate summary worth computing once all folds are in: mean accuracy
+    across folds is a natural first thing to report, but given how few
+    examples are in some folds, also worth printing total TP/TN/FP/FN
+    summed across ALL folds — that's less sensitive to any single tiny
+    fold's noise than averaging per-fold accuracies would be.
+    """
+    raise NotImplementedError
+
+
 if __name__ == "__main__":
-    # Sanity-check scaffold — fill in once the pieces above work. Suggested
-    # first check: build a PalmProbeDataset + a MaskedAutoencoder (loaded
-    # from a real checkpoint, per mae.py's __main__ pattern), run
-    # leave_one_tile_out_cv, and print each fold's results.
-    pass
+    main()
