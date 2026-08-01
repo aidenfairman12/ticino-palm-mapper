@@ -43,19 +43,23 @@ from shapely.geometry import box, Point
 from .dataset import ChannelStats, load_tile, normalize
 
 
-def find_covering_tiles(point, tile_paths: list[Path]) -> list[Path]:
-    """Return every tile in `tile_paths` whose bounds contain `point`.
+def load_tile_bounds(tile_paths: list[Path]) -> list[tuple[Path, "shapely.geometry.base.BaseGeometry"]]:
+    """Open every tile in `tile_paths` exactly once and return (path, bounds-box)
+    pairs, for repeated in-memory point-in-tile lookups via find_covering_tiles.
     """
     ret = []
     for path in tile_paths:
       with rasterio.open(path) as src:
         coords = src.bounds
-        
-      tile_box = box(*coords)
-      if point.within(tile_box):
-        ret.append(path)
-        
+      ret.append((path, box(*coords)))
     return ret
+
+
+def find_covering_tiles(point, tile_boxes: list[tuple[Path, "shapely.geometry.base.BaseGeometry"]]) -> list[Path]:
+    """Return every tile whose bounds (from `tile_boxes`, see load_tile_bounds)
+    contain `point`.
+    """
+    return [path for path, tile_box in tile_boxes if point.within(tile_box)]
         
         
 
@@ -140,19 +144,21 @@ class PalmProbeDataset(Dataset):
         self.stats = stats
         self.crop_size = crop_size
         self.examples = []
-        
+
+        tile_boxes = load_tile_bounds(tile_paths)
+
         for point in positive_points:
-          cov_tiles = find_covering_tiles(point, tile_paths)
-          
+          cov_tiles = find_covering_tiles(point, tile_boxes)
+
           for tile in cov_tiles:
             self.examples.append((tile, point.x, point.y, 1.0))
-            
+
         for point in negative_points:
           x, y = point
           coord = shapely.geometry.Point(x, y)
-          
-          cov_tiles = find_covering_tiles(coord, tile_paths)
-          
+
+          cov_tiles = find_covering_tiles(coord, tile_boxes)
+
           for tile in cov_tiles:
             self.examples.append((tile, coord.x, coord.y, 0.0))
 
