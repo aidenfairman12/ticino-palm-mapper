@@ -42,17 +42,6 @@ def extract_all_features(
     """Run every example in `dataset` through the frozen encoder once,
     pooling each to a single feature vector.
 
-    For each (image, label) in the dataset: move image to device, add a
-    batch dim (encode_full expects (B, C, H, W)), run model.encode_full(x)
-    under torch.no_grad() (no gradients needed — you're not training the
-    encoder), and pool the (1, 1+N, D) output down to (D,). Decide your
-    pooling strategy here (per encode_full's docstring: CLS token
-    `encoded[0, 0]` is well-motivated for a DINOv2 backbone, or mean-pool
-    the patch tokens `encoded[0, 1:].mean(dim=0)` — pick one, document why).
-
-    Also collect each example's tile_path (dataset.examples[i][0]) — needed
-    by leave_one_tile_out_cv to know which fold an example belongs to.
-
     Returns: (features, labels, tile_paths) — features (N, D) float32,
     labels (N,) float32, tile_paths a plain list of N Paths (parallel to
     the tensors, not itself a tensor).
@@ -80,19 +69,22 @@ def train_probe(
     """Train a single nn.Linear(embed_dim, 1) classifier on precomputed
     features (no encoder involved at all here — pure feature -> label
     classification).
-
-    Standard loop: build the Linear layer, an optimizer (plain Adam is
-    fine — no need for AdamW's weight decay on a single tiny layer), and
-    nn.BCEWithLogitsLoss. For `epochs` iterations: zero grad, forward pass
-    (raw logits, no sigmoid — BCEWithLogitsLoss applies it internally,
-    more numerically stable than doing it yourself), compute loss against
-    `labels`, backward, step. No batching needed — with this few examples,
-    just pass the whole `features` tensor through every iteration (full-
-    batch gradient descent).
-
+    
     Returns the trained nn.Linear.
     """
-    raise NotImplementedError
+    probe = nn.Linear(embed_dim, 1)
+    optimizer = torch.optim.Adam(probe.parameters(), lr=lr)
+    loss_fn = nn.BCEWithLogitsLoss()
+    
+    for epoch in range(epochs):
+      optimizer.zero_grad()
+      logits = probe(features).squeeze(-1)
+      loss = loss_fn(logits, labels)
+      loss.backward()
+      optimizer.step()
+      
+    return probe
+      
 
 
 def evaluate_probe(
@@ -112,7 +104,26 @@ def evaluate_probe(
     fold-by-fold results in context rather than trusting one aggregate
     number blindly.
     """
-    raise NotImplementedError
+    
+    with torch.no_grad():
+      logits = probe(features).squeeze(-1)
+      preds = (logits > 0).float()
+      acc = (preds == labels).float().mean().item()
+      
+      tPos = ((preds == 1) & (labels == 1)).sum().item()
+      tNeg = ((preds == 0) & (labels == 0)).sum().item()
+      fPos = ((preds == 1) & (labels == 0)).sum().item()
+      fNeg = ((preds == 0) & (labels == 1)).sum().item()
+    
+    ret = {
+      "accuracy": acc,
+      "true_pos": tPos,
+      "true_neg": tNeg,
+      "false_pos": fPos,
+      "false_neg": fNeg
+    }
+    
+    return ret
 
 
 def leave_one_tile_out_cv(
