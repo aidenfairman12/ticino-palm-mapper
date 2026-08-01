@@ -30,11 +30,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import timm
 import torch
 import torch.nn as nn
 
-from src.data.probe_dataset import PalmProbeDataset
-from src.models.mae import MaskedAutoencoder
+from src.data.dataset import load_confirmed_points
+from src.data.probe_dataset import PalmProbeDataset, sample_negative_points
+from src.models.mae import MaskedAutoencoder, adapt_patch_embed
+from src.training.pretrain_ssl import glob_tiles
 
 
 def extract_all_features(
@@ -57,7 +60,7 @@ def extract_all_features(
       
       feature = encoded[0,0]
       features.append(feature)
-      labels.append(label)
+      labels.append(label.to(device))
       tile_paths.append(dataset.examples[idx][0])
       
     
@@ -73,7 +76,7 @@ def train_probe(
     
     Returns the trained nn.Linear.
     """
-    probe = nn.Linear(embed_dim, 1)
+    probe = nn.Linear(embed_dim, 1).to(features.device)
     optimizer = torch.optim.Adam(probe.parameters(), lr=lr)
     loss_fn = nn.BCEWithLogitsLoss()
     
@@ -172,23 +175,88 @@ def parse_probe_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """Wire everything together: load the checkpoint + rebuild the model
-    (same architecture-config-then-load_state_dict pattern as mae.py's
-    __main__ and the reconstruction-quality notebook — the config values
-    MUST match whatever the checkpoint was actually trained with, or
-    load_state_dict will fail on a shape mismatch), build the confirmed
-    positive points + sampled negatives + PalmProbeDataset, run
-    leave_one_tile_out_cv, and print a per-fold + aggregate summary.
+    args = parse_probe_args()
 
-    Device selection: same cuda -> mps -> cpu fallback as pretrain_ssl.py.
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
 
-    Aggregate summary worth computing once all folds are in: mean accuracy
-    across folds is a natural first thing to report, but given how few
-    examples are in some folds, also worth printing total TP/TN/FP/FN
-    summed across ALL folds — that's less sensitive to any single tiny
-    fold's noise than averaging per-fold accuracies would be.
-    """
-    raise NotImplementedError
+    # Load checkpoint first — its stats tell us in_chans (len of the mean
+    # vector) rather than needing a separate, error-prone CLI flag that
+    # could drift out of sync with what the checkpoint actually expects.
+    checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
+    stats = checkpoint["stats"]
+    in_chans = len(stats.mean)
+
+    # Architecture constants must match pretrain_ssl.py's exactly, or
+    # load_state_dict below will fail on a shape mismatch.
+    backbone_name = "vit_small_patch14_dinov2.lvd142m"
+    img_size = 224
+    patch_size = 14
+    embed_dim = 384
+    decoder_embed_dim = 192
+    decoder_depth = 4
+    decoder_num_heads = 6
+    mask_ratio = 0.75
+
+    backbone = timm.create_model(backbone_name, pretrained=True)
+    backbone = adapt_patch_embed(backbone, in_chans)
+    model = MaskedAutoencoder(
+        backbone, img_size, patch_size, in_chans, embed_dim,
+        decoder_embed_dim, decoder_depth, decoder_num_heads, mask_ratio,
+    )
+    model.backbone.patch_embed.strict_img_size = False
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model = model.to(device)
+
+    # Positives: "distinct"-signal confirmed points. Negatives: sampled
+    # locations, excluded from being near either a confirmed point OR a
+    # "none"-signal point (already-reviewed-but-inconclusive — a
+    # reasonable stand-in for "don't sample here" alongside the confirmed
+    # positives, without needing a separate raw-GBIF-occurrences file for
+    # this first real run).
+    points = load_confirmed_points(args.confirmed_points)
+    distinct = points[points["ndvi_signal_current"] == "distinct"]
+    none_signal = points[points["ndvi_signal_current"] == "none"]
+
+    tile_paths = glob_tiles(args.tile_dirs, in_chans)
+
+    negatives = sample_negative_points(
+        positive_points=distinct.geometry,
+        candidate_points=none_signal.geometry,
+        tile_paths=tile_paths,
+        n_negatives=args.n_negatives,
+        min_distance_m=args.min_distance_m,
+        seed=args.seed,
+    )
+
+    dataset = PalmProbeDataset(distinct.geometry, negatives, tile_paths, stats, args.crop_size)
+    print(f"probe dataset: {len(dataset)} examples "
+          f"({sum(1 for e in dataset.examples if e[3] == 1.0)} positive, "
+          f"{sum(1 for e in dataset.examples if e[3] == 0.0)} negative)")
+
+    results = leave_one_tile_out_cv(model, dataset, device, args.epochs, args.lr)
+
+    print(f"\n{len(results)} folds:")
+    total_tp = total_tn = total_fp = total_fn = 0
+    accuracies = []
+    for tile_name, res in results.items():
+        print(f"  {tile_name}: {res}")
+        accuracies.append(res["accuracy"])
+        total_tp += res["true_pos"]
+        total_tn += res["true_neg"]
+        total_fp += res["false_pos"]
+        total_fn += res["false_neg"]
+
+    mean_acc = sum(accuracies) / len(accuracies) if accuracies else float("nan")
+    total = total_tp + total_tn + total_fp + total_fn
+    pooled_acc = (total_tp + total_tn) / total if total else float("nan")
+    print(f"\nmean per-fold accuracy: {mean_acc:.3f}")
+    print(f"pooled accuracy (all folds combined): {pooled_acc:.3f} "
+          f"(tp={total_tp}, tn={total_tn}, fp={total_fp}, fn={total_fn})")
 
 
 if __name__ == "__main__":
