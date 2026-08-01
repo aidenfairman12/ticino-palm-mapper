@@ -91,18 +91,6 @@ def evaluate_probe(
     probe: nn.Linear, features: torch.Tensor, labels: torch.Tensor
 ) -> dict:
     """Evaluate a trained probe on held-out features/labels.
-
-    Under torch.no_grad(): get logits from probe(features), threshold at 0
-    (equivalent to thresholding sigmoid(logits) at 0.5) to get predicted
-    labels, compare against true labels.
-
-    Return a dict with at least: accuracy, and the raw counts (true
-    positives/negatives, false positives/negatives) — with folds this
-    small, a single accuracy number can be misleading (e.g. 1 wrong
-    prediction out of 3 examples looks dramatic), so keeping the raw
-    counts around lets you (and anyone reading results later) judge
-    fold-by-fold results in context rather than trusting one aggregate
-    number blindly.
     """
     
     with torch.no_grad():
@@ -132,7 +120,7 @@ def leave_one_tile_out_cv(
     device: torch.device,
     epochs: int,
     lr: float,
-) -> list[dict]:
+) -> dict:
     """Run leave-one-tile-out CV: for each unique tile that has at least
     one POSITIVE example, hold it out, train on everything else, evaluate
     on the held-out tile's examples, repeat.
@@ -147,8 +135,8 @@ def leave_one_tile_out_cv(
       - for each such tile: build a boolean mask splitting features/labels
         into "this tile" (held out) vs "everything else" (train), call
         train_probe on the train split, evaluate_probe on the held-out
-        split, record the result (include which tile, for readability),
-      - return the list of per-fold result dicts.
+        split, record the result,
+      - return a dict keyed by held-out tile path, one entry per fold.
 
     Note on negatives: since negatives were sampled independently of any
     specific tile grouping, decide how they get distributed across folds —
@@ -157,7 +145,27 @@ def leave_one_tile_out_cv(
     tile-membership logic as positives. No special-casing needed if you
     already have each example's tile_path from extract_all_features.
     """
-    raise NotImplementedError
+    
+    ret = {}
+    
+    features, labels, tile_paths = extract_all_features(model, dataset, device)
+    embed_dim = features.shape[1]
+    positive_tiles = {tp for tp, label in zip(tile_paths, labels) if label == 1}
+    
+    for tile in positive_tiles:
+      mask = torch.tensor([tp == tile for tp in tile_paths])
+      
+      test_feat = features[mask]
+      train_feat = features[~mask]
+      
+      train_lab, test_label = labels[~mask], labels[mask]
+      
+      probe = train_probe(train_feat, train_lab, embed_dim, epochs, lr)
+
+      ret[tile] = evaluate_probe(probe, test_feat, test_label)
+      
+    return ret
+      
 
 
 if __name__ == "__main__":
