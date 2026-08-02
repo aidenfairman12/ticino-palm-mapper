@@ -126,6 +126,13 @@ def parse_score_args() -> argparse.Namespace:
     p.add_argument("--tile-dirs", type=Path, nargs="+", required=True)
     p.add_argument("--confirmed-points", type=Path, required=True)
     p.add_argument("--scouted-points", type=Path, default=None)
+    p.add_argument(
+        "--hard-negatives", type=Path, default=None,
+        help="Optional path to active_learning_hard_negatives.geojson (from "
+             "12_merge_review_verdicts.py) — added ON TOP of the --n-negatives random "
+             "negatives when training the production probe, same reasoning as "
+             "linear_probe.py's --hard-negatives.",
+    )
     p.add_argument("--n-samples", type=int, default=500, help="Number of random locations to score.")
     p.add_argument("--n-negatives", type=int, default=30, help="Negatives for training the production probe.")
     p.add_argument("--min-distance-m", type=float, default=20.0)
@@ -189,6 +196,11 @@ def main() -> None:
         min_distance_m=args.min_distance_m,
         seed=args.seed,
     )
+
+    if args.hard_negatives is not None:
+        hard_neg = gpd.read_file(args.hard_negatives)
+        negatives = negatives + [(pt.x, pt.y) for pt in hard_neg.geometry]
+        print(f"negatives: {len(negatives) - len(hard_neg)} random + {len(hard_neg)} hard = {len(negatives)} total")
 
     dataset = PalmProbeDataset(positive_geoms, negatives, tile_paths, stats, args.crop_size)
     print(f"training production probe on {len(dataset)} examples "

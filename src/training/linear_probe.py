@@ -193,6 +193,15 @@ def parse_probe_args() -> argparse.Namespace:
              "'distinct' set, regardless of confidence tier. Accepts some false positives in "
              "exchange for meaningfully more positive-tile fold coverage.",
     )
+    p.add_argument(
+        "--hard-negatives", type=Path, default=None,
+        help="Optional path to active_learning_hard_negatives.geojson (from "
+             "12_merge_review_verdicts.py) — locations that scored high but were "
+             "confirmed not-palm on manual review. Added ON TOP of the --n-negatives "
+             "random negatives (not a replacement), since they're a targeted, scarce "
+             "resource meant to teach the probe the confusable cases random sampling "
+             "essentially never produces.",
+    )
     p.add_argument("--n-negatives", type=int, default=30)
     p.add_argument("--min-distance-m", type=float, default=20.0)
     p.add_argument("--crop-size", type=int, default=224)
@@ -269,6 +278,11 @@ def main() -> None:
         min_distance_m=args.min_distance_m,
         seed=args.seed,
     )
+
+    if args.hard_negatives is not None:
+        hard_neg = gpd.read_file(args.hard_negatives)
+        negatives = negatives + [(pt.x, pt.y) for pt in hard_neg.geometry]
+        print(f"negatives: {len(negatives) - len(hard_neg)} random + {len(hard_neg)} hard = {len(negatives)} total")
 
     dataset = PalmProbeDataset(positive_geoms, negatives, tile_paths, stats, args.crop_size)
     print(f"probe dataset: {len(dataset)} examples "
