@@ -18,6 +18,14 @@ mkdir -p logs checkpoints_bellinzona
 
 start_time=$SECONDS
 
+# Resume from whichever checkpoint is newest, so this script can be chained
+# (see submit_chain.sh) without hardcoding an epoch number each time.
+LATEST_CKPT=$(ls -v checkpoints_bellinzona/checkpoint_epoch*.pt 2>/dev/null | tail -n 1)
+RESUME_ARGS=()
+if [ -n "$LATEST_CKPT" ]; then
+    RESUME_ARGS=(--resume-from "$LATEST_CKPT")
+fi
+
 # `import timm` (pulled in via torchvision/Pillow) loads its own libjpeg into
 # the process before rasterio does. Because shared libs are deduped by SONAME
 # once loaded, rasterio's libtiff then silently binds to that incompatible
@@ -37,7 +45,7 @@ apptainer exec --nv --cleanenv \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821 \
         --in-chans 6 \
         --checkpoint-dir checkpoints_bellinzona \
-        --resume-from checkpoints_bellinzona/checkpoint_epoch59.pt
+        "${RESUME_ARGS[@]}"
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))
