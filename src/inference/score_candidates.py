@@ -74,10 +74,17 @@ def score_locations(
     device: torch.device,
 ) -> list[dict]:
     """Score every (x, y) in `locations` with `probe`, one result per
-    (location, covering tile) pair — a location covered by more than one
-    NIR-date tile gets scored once per tile, same multi-date handling as
-    PalmProbeDataset. Returns predicted_prob via sigmoid(logit), so results
-    can be sorted/thresholded meaningfully rather than just a hard 0/1."""
+    location. Unlike PalmProbeDataset (which deliberately fans a labeled
+    point out across every covering NIR-date tile for training diversity),
+    here a location covered by multiple dates is scored on only the most
+    recent date's tile — this is a review/candidate list, so a single real-
+    world spot should appear as ONE card, not once per date it happens to
+    have extra coverage for. (Tile filenames are identical across date
+    directories — only the parent directory differs — so sorting covering
+    tiles by parent dir name and taking the last picks the newest date,
+    since feature_stack_rs_<YYYYMMDD> sorts chronologically as a string.)
+    Returns predicted_prob via sigmoid(logit), so results can be
+    sorted/thresholded meaningfully rather than just a hard 0/1."""
     model.eval()
     results = []
 
@@ -89,22 +96,24 @@ def score_locations(
     for x, y in locations:
         point = Point(x, y)
         covering = find_covering_tiles(point, tile_boxes)
+        if not covering:
+            continue
+        tile_path = sorted(covering, key=lambda p: p.parent.name)[-1]
 
-        for tile_path in covering:
-            arr, transform, _ = load_tile(tile_path)
-            arr = normalize(arr, stats)
-            crop = crop_centered_on_point(arr, transform, point, crop_size)
+        arr, transform, _ = load_tile(tile_path)
+        arr = normalize(arr, stats)
+        crop = crop_centered_on_point(arr, transform, point, crop_size)
 
-            img = torch.from_numpy(crop).float().unsqueeze(0).to(device)
-            with torch.no_grad():
-                encoded = model.encode_full(img)
-                feature = encoded[0, 0].unsqueeze(0)
-                logit = probe(feature).squeeze(-1)
-                prob = torch.sigmoid(logit).item()
+        img = torch.from_numpy(crop).float().unsqueeze(0).to(device)
+        with torch.no_grad():
+            encoded = model.encode_full(img)
+            feature = encoded[0, 0].unsqueeze(0)
+            logit = probe(feature).squeeze(-1)
+            prob = torch.sigmoid(logit).item()
 
-            results.append({
-                "x": x, "y": y, "tile": tile_path.name, "predicted_prob": prob,
-            })
+        results.append({
+            "x": x, "y": y, "tile": tile_path.name, "predicted_prob": prob,
+        })
 
     return results
 
