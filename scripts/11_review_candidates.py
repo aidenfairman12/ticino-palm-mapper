@@ -35,13 +35,13 @@ import geopandas as gpd
 import numpy as np
 from PIL import Image
 from pyproj import Transformer
+from rasterio.transform import rowcol, xy
 from shapely.geometry import Point
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.data.config import PROJECT_CRS, ensure_dir  # noqa: E402
 from src.data.dataset import load_tile  # noqa: E402
-from src.data.probe_dataset import crop_centered_on_point  # noqa: E402
 
 
 def _png_b64(arr_hwc: np.ndarray) -> str:
@@ -59,14 +59,25 @@ def _crosshair(img: np.ndarray) -> np.ndarray:
     return img
 
 
-def _rgb_crop(tile_path: Path, point: Point, crop_size: int) -> np.ndarray:
-    """Load `tile_path`, crop centered on `point`, return an (H,W,3) uint8
-    RGB image with a per-channel percentile contrast stretch — the same
-    fix applied to the reconstruction-quality notebook, since this RS-
-    delivery data is not standard 0-255.
+def _rgb_crop(tile_path: Path, point: Point, crop_size: int) -> tuple[np.ndarray, tuple[float, float, float, float]]:
+    """Load `tile_path`, crop centered on `point` (same clamped-offset logic
+    as crop_centered_on_point), return an (H,W,3) uint8 RGB image with a
+    per-channel percentile contrast stretch, plus the crop's real-world
+    bounding box (xmin, ymin, xmax, ymax) — needed so the review page can
+    map a click on the displayed image back to a real-world coordinate
+    (the scored point isn't always exactly on the palm; clicking lets the
+    reviewer record where it actually is).
     """
     arr, transform, _ = load_tile(tile_path)  # (C,H,W) raw values, NOT normalized
-    crop = crop_centered_on_point(arr, transform, point, crop_size)
+    H, W = arr.shape[1], arr.shape[2]
+    rows_px, cols_px = rowcol(transform, point.x, point.y)
+    row_start = max(0, min(rows_px - crop_size // 2, H - crop_size))
+    col_start = max(0, min(cols_px - crop_size // 2, W - crop_size))
+    crop = arr[:, row_start:row_start + crop_size, col_start:col_start + crop_size]
+
+    x0, y0 = xy(transform, row_start, col_start, offset="ul")
+    x1, y1 = xy(transform, row_start + crop_size, col_start + crop_size, offset="ul")
+    bbox = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
 
     in_chans = crop.shape[0]
     rgb_idx = slice(1, 4) if in_chans == 6 else slice(0, 3)
@@ -76,12 +87,13 @@ def _rgb_crop(tile_path: Path, point: Point, crop_size: int) -> np.ndarray:
     for c in range(3):
         lo, hi = np.percentile(rgb[c], (2, 98))
         out[c] = np.clip((rgb[c] - lo) / (hi - lo + 1e-6), 0, 1) * 255
-    return np.transpose(out.astype("uint8"), (1, 2, 0))  # (H,W,3)
+    return np.transpose(out.astype("uint8"), (1, 2, 0)), bbox  # (H,W,3), bbox
 
 
 CARD = """
-<div class="card">
-  <img src="{img}" title="predicted_prob={prob:.3f}"/>
+<div class="card" data-idx="{i}" data-tile="{tile}" data-x="{x:.2f}" data-y="{y:.2f}" data-prob="{prob:.4f}"
+     data-cropxmin="{cxmin:.2f}" data-cropymin="{cymin:.2f}" data-cropxmax="{cxmax:.2f}" data-cropymax="{cymax:.2f}">
+  <div class="imgwrap"><img src="{img}" title="predicted_prob={prob:.3f} — click the actual palm to correct its location"/></div>
   <div class="meta">
     <b>#{i}</b> &nbsp; prob=<b class="{probclass}">{prob:.3f}</b><br/>
     <span class="id">{tile}</span><br/>
@@ -89,21 +101,123 @@ CARD = """
     <a href="{sat}" target="_blank">Sat</a> ·
     <a href="{swiss}" target="_blank">swisstopo</a>
   </div>
+  <div class="verdict-btns">
+    <button class="vb vb-palm" onclick="setVerdict({i},'palm')" title="Key: P">Palm</button>
+    <button class="vb vb-not" onclick="setVerdict({i},'not_palm')" title="Key: N">Not palm</button>
+    <button class="vb vb-unsure" onclick="setVerdict({i},'unsure')" title="Key: U">Unsure</button>
+  </div>
 </div>"""
 
 PAGE = """<!doctype html><meta charset="utf-8"><title>candidate review</title>
 <style>
  body{{font-family:system-ui,Arial;margin:16px;background:#111;color:#eee}}
  h1{{font-size:18px}} .grid{{display:flex;flex-wrap:wrap;gap:10px}}
- .card{{width:{imgw}px;background:#1d1d1d;border:1px solid #333;border-radius:8px;padding:6px}}
- .card img{{width:{imgw}px;height:{imgw}px;object-fit:cover;border-radius:5px;image-rendering:pixelated}}
+ .card{{width:{imgw}px;background:#1d1d1d;border:2px solid #333;border-radius:8px;padding:6px;transition:border-color .15s}}
+ .imgwrap{{position:relative;width:{imgw}px;height:{imgw}px}}
+ .imgwrap img{{width:{imgw}px;height:{imgw}px;object-fit:cover;border-radius:5px;image-rendering:pixelated;cursor:crosshair}}
+ .click-marker{{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#4fc3f7;border:2px solid #fff;pointer-events:none;display:none;box-shadow:0 0 3px #000}}
  .meta{{font-size:11px;line-height:1.5;margin-top:4px}} .id{{color:#888;font-size:10px}}
  a{{color:#6cf;text-decoration:none}} a:hover{{text-decoration:underline}}
  .hi{{color:#e07a5f}} .lo{{color:#8fb45c}}
+ .verdict-btns{{display:flex;gap:4px;margin-top:6px}}
+ .vb{{flex:1;font-size:11px;padding:5px 0;border:1px solid #444;border-radius:4px;background:#262626;color:#ccc;cursor:pointer}}
+ .vb:hover{{background:#333}}
+ .vb-palm.active{{background:#2e7d32;border-color:#2e7d32;color:#fff}}
+ .vb-not.active{{background:#8b3a3a;border-color:#8b3a3a;color:#fff}}
+ .vb-unsure.active{{background:#8a6d1a;border-color:#8a6d1a;color:#fff}}
+ .card.verdict-palm{{border-color:#2e7d32}}
+ .card.verdict-not_palm{{border-color:#8b3a3a;opacity:.55}}
+ .card.verdict-unsure{{border-color:#8a6d1a}}
+ #toolbar{{position:sticky;top:0;background:#111;padding:10px 0;z-index:10;display:flex;align-items:center;gap:14px;border-bottom:1px solid #333;margin-bottom:10px}}
+ #toolbar button{{font-size:13px;padding:7px 14px;border-radius:5px;border:1px solid #555;background:#1d1d1d;color:#eee;cursor:pointer}}
+ #toolbar button:hover{{background:#292929}}
+ #progress{{font-size:12px;color:#aaa}}
 </style>
+<div id="toolbar">
+  <button onclick="exportVerdicts()">Export verdicts (CSV)</button>
+  <span id="progress">0 / {n} reviewed</span>
+  <span style="font-size:11px;color:#666">Click a card's image to focus it (P/N/U to verdict) — if the red crosshair isn't on the palm, click the actual palm instead, a blue dot marks the correction. Unlabeled cards are skipped on export.</span>
+</div>
 <h1>candidate review — {n} locations</h1>
 <p style="font-size:12px;color:#aaa">{subtitle}</p>
 <div class="grid">{cards}</div>
+<script>
+const verdicts = {{}};
+const corrections = {{}};  // idx -> [world_x, world_y], only set once the reviewer clicks the image
+const TOTAL = {n};
+let focusedIdx = null;
+
+function setVerdict(idx, verdict) {{
+  verdicts[idx] = verdict;
+  const card = document.querySelector(`[data-idx="${{idx}}"]`);
+  card.classList.remove('verdict-palm', 'verdict-not_palm', 'verdict-unsure');
+  card.classList.add('verdict-' + verdict);
+  card.querySelectorAll('.vb').forEach(b => b.classList.remove('active'));
+  card.querySelector('.vb-' + (verdict === 'not_palm' ? 'not' : verdict)).classList.add('active');
+  updateProgress();
+}}
+
+function updateProgress() {{
+  document.getElementById('progress').textContent = Object.keys(verdicts).length + ' / ' + TOTAL + ' reviewed';
+}}
+
+function exportVerdicts() {{
+  const rows = [['index', 'tile', 'x', 'y', 'corrected_x', 'corrected_y', 'predicted_prob', 'verdict']];
+  document.querySelectorAll('.card').forEach(card => {{
+    const idx = card.dataset.idx;
+    if (!(idx in verdicts)) return;
+    const corr = corrections[idx];
+    const cx = corr ? corr[0].toFixed(2) : card.dataset.x;
+    const cy = corr ? corr[1].toFixed(2) : card.dataset.y;
+    rows.push([idx, card.dataset.tile, card.dataset.x, card.dataset.y, cx, cy, card.dataset.prob, verdicts[idx]]);
+  }});
+  const csv = rows.map(r => r.join(',')).join('\\n');
+  const blob = new Blob([csv], {{type: 'text/csv'}});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'candidate_verdicts.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}}
+
+// corrected_x/corrected_y default to the original scored point (x, y).
+// Clicking the image records where the palm actually is, in case the
+// scored/crosshair point is off by a few meters — the marker (blue dot)
+// gives visual confirmation of what was recorded.
+document.querySelectorAll('.card').forEach(card => {{
+  const img = card.querySelector('img');
+  const wrap = card.querySelector('.imgwrap');
+  const marker = document.createElement('div');
+  marker.className = 'click-marker';
+  wrap.appendChild(marker);
+
+  img.addEventListener('click', (e) => {{
+    focusedIdx = card.dataset.idx;
+
+    const rect = img.getBoundingClientRect();
+    const fx = (e.clientX - rect.left) / rect.width;
+    const fy = (e.clientY - rect.top) / rect.height;
+    marker.style.left = (fx * 100) + '%';
+    marker.style.top = (fy * 100) + '%';
+    marker.style.display = 'block';
+
+    const xmin = parseFloat(card.dataset.cropxmin), xmax = parseFloat(card.dataset.cropxmax);
+    const ymin = parseFloat(card.dataset.cropymin), ymax = parseFloat(card.dataset.cropymax);
+    const worldX = xmin + fx * (xmax - xmin);
+    const worldY = ymax - fy * (ymax - ymin);  // image y grows downward, world y grows upward
+    corrections[card.dataset.idx] = [worldX, worldY];
+  }});
+}});
+
+document.addEventListener('keydown', (e) => {{
+  if (focusedIdx === null) return;
+  const key = e.key.toLowerCase();
+  if (key === 'p') setVerdict(focusedIdx, 'palm');
+  else if (key === 'n') setVerdict(focusedIdx, 'not_palm');
+  else if (key === 'u') setVerdict(focusedIdx, 'unsure');
+}});
+</script>
 """
 
 
@@ -144,7 +258,7 @@ def main() -> None:
             continue
 
         point = Point(row.geometry.x, row.geometry.y)
-        rgb = _rgb_crop(tile_path, point, args.crop_size)
+        rgb, (cxmin, cymin, cxmax, cymax) = _rgb_crop(tile_path, point, args.crop_size)
         rgb = _crosshair(rgb.copy())
 
         lon, lat = to_wgs.transform(row.geometry.x, row.geometry.y)
@@ -153,7 +267,8 @@ def main() -> None:
         cards.append(CARD.format(
             i=i, img=_png_b64(rgb), prob=prob,
             probclass="hi" if prob >= 0.5 else "lo",
-            tile=row["tile"],
+            tile=row["tile"], x=row.geometry.x, y=row.geometry.y,
+            cxmin=cxmin, cymin=cymin, cxmax=cxmax, cymax=cymax,
             sv=f"https://www.google.com/maps?q=&layer=c&cbll={lat:.6f},{lon:.6f}",
             sat=f"https://www.google.com/maps/@{lat:.6f},{lon:.6f},21z/data=!3m1!1e3",
             swiss=f"https://map.geo.admin.ch/?E={row.geometry.x:.0f}&N={row.geometry.y:.0f}&zoom=13&crosshair=marker",
