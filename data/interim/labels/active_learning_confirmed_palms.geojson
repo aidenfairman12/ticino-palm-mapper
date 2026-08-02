@@ -1,0 +1,10 @@
+{
+"type": "FeatureCollection",
+"name": "active_learning_confirmed_palms",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::2056" } },
+"features": [
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c071_r050_nirchm.tif", "predicted_prob_at_review": 0.8687, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2721508.799999999813735, 1115662.91 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c021_r076_nirchm.tif", "predicted_prob_at_review": 0.8672, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2717018.46, 1113325.46 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c021_r076_nirchm.tif", "predicted_prob_at_review": 0.774, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2717018.680000000167638, 1113325.91 ] } }
+]
+}
