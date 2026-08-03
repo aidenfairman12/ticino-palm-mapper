@@ -80,8 +80,18 @@ def train_probe(
     """
     probe = nn.Linear(embed_dim, 1).to(features.device)
     optimizer = torch.optim.Adam(probe.parameters(), lr=lr)
-    loss_fn = nn.BCEWithLogitsLoss()
-    
+
+    # Negatives outnumber positives (~3:1 with hard negatives included, since they
+    # fan out across more multi-date tiles than positives do), and unweighted BCE
+    # was found to bias the boundary toward predicting "not palm" — recall collapsed
+    # to ~50% while specificity sat at 96%. pos_weight rebalances the loss's gradient
+    # contribution per class without discarding any hard negatives, unlike
+    # subsampling the negative pool would.
+    n_pos = labels.sum()
+    n_neg = labels.numel() - n_pos
+    pos_weight = n_neg / n_pos if n_pos > 0 else torch.tensor(1.0, device=labels.device)
+    loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+
     for epoch in range(epochs):
       optimizer.zero_grad()
       logits = probe(features).squeeze(-1)
