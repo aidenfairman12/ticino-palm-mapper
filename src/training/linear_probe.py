@@ -228,12 +228,15 @@ def main() -> None:
     stats = checkpoint["stats"]
     in_chans = len(stats.mean)
 
-    # Architecture constants must match pretrain_ssl.py's exactly, or
-    # load_state_dict below will fail on a shape mismatch.
-    backbone_name = "vit_small_patch14_dinov2.lvd142m"
+    # backbone_name/embed_dim are read from the checkpoint itself (saved by
+    # pretrain_ssl.py's save_checkpoint) rather than hardcoded, since --model-size
+    # now lets a run use vit_small or vit_base — hardcoding here would silently
+    # mismatch and fail on load_state_dict for anything but the default. Fallback
+    # covers checkpoints saved before this field existed (all were vit_small).
+    backbone_name = checkpoint.get("backbone_name", "vit_small_patch14_dinov2.lvd142m")
     img_size = 224
     patch_size = 14
-    embed_dim = 384
+    embed_dim = checkpoint.get("embed_dim", 384)
     decoder_embed_dim = 192
     decoder_depth = 4
     decoder_num_heads = 6

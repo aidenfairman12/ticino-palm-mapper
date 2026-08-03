@@ -221,16 +221,36 @@ def save_checkpoint(
     epoch: int,
     stats: ChannelStats,
     best_val_loss: float,
+    backbone_name: str,
+    embed_dim: int,
 ) -> None:
-    """Save model/optimizer state, epoch, and normalization stats to `path`."""
+    """Save model/optimizer state, epoch, normalization stats, and the architecture
+    actually used to `path` — backbone_name/embed_dim are read back by downstream
+    eval scripts (linear_probe.py, score_candidates.py) instead of being hardcoded
+    there, same reasoning as inferring in_chans from the checkpoint's saved stats:
+    a checkpoint should be self-describing rather than relying on the caller to
+    separately remember (and keep in sync) which architecture produced it.
+    """
     checkpoint = {
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "epoch": epoch,
         "stats": stats,
         "best_val_loss": best_val_loss,
+        "backbone_name": backbone_name,
+        "embed_dim": embed_dim,
     }
     torch.save(checkpoint, f=path)
+
+
+# backbone_name -> embed_dim aren't independent: embed_dim is a fixed property of
+# whichever DINOv2 variant is loaded, not a free parameter. Keeping them paired here
+# means an invalid combination is structurally impossible via the CLI, rather than a
+# silent shape-mismatch bug from two separately-set flags drifting out of sync.
+MODEL_CONFIGS = {
+    "small": ("vit_small_patch14_dinov2.lvd142m", 384),
+    "base": ("vit_base_patch14_dinov2.lvd142m", 768),
+}
 
 
 def parse_pretrain_args() -> argparse.Namespace:
@@ -264,7 +284,19 @@ def parse_pretrain_args() -> argparse.Namespace:
         "--resume-from", type=Path, default=None,
         help="Path to a checkpoint to resume training from — reuses its stats/model/"
              "optimizer state and continues at the next epoch, instead of starting fresh.",
-    )    
+    )
+    p.add_argument(
+        "--model-size", type=str, default="small", choices=sorted(MODEL_CONFIGS),
+        help="Backbone variant — selects both the timm model name and its embed_dim "
+             "together (they aren't independent; picking them separately risks a "
+             "mismatched combination that only fails as a shape error deep in the model).",
+    )
+    p.add_argument(
+        "--mask-ratio", type=float, default=0.75,
+        help="Fraction of patches masked during MAE pretraining (paper default 0.75, "
+             "tuned for ImageNet-style natural images — this project's more homogeneous "
+             "domain imagery may benefit from a lower ratio).",
+    )
     return p.parse_args()
 
 
@@ -279,15 +311,14 @@ def main() -> None:
         device = torch.device("cpu")
 
     tile_dirs = args.tile_dirs
-    backbone_name = "vit_small_patch14_dinov2.lvd142m"
+    backbone_name, embed_dim = MODEL_CONFIGS[args.model_size]
     in_chans = args.in_chans
     img_size = 224
     patch_size = 14
-    embed_dim = 384
     decoder_embed_dim = 192
     decoder_depth = 4
     decoder_num_heads = 6
-    mask_ratio = 0.75
+    mask_ratio = args.mask_ratio
 
     crop_size = 224
     batch_size = args.batch_size
@@ -346,12 +377,12 @@ def main() -> None:
         print(f"epoch {epoch}: train_loss={train_loss:.4f}, val_loss={val_loss:.4f}")
 
         if (epoch + 1) % checkpoint_every == 0:
-            save_checkpoint(checkpoint_dir / f"checkpoint_epoch{epoch}.pt", model, optimizer, epoch, stats, best_val_loss)
+            save_checkpoint(checkpoint_dir / f"checkpoint_epoch{epoch}.pt", model, optimizer, epoch, stats, best_val_loss, backbone_name, embed_dim)
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
-            save_checkpoint(checkpoint_dir / "checkpoint_best.pt", model, optimizer, epoch, stats, best_val_loss)
+            save_checkpoint(checkpoint_dir / "checkpoint_best.pt", model, optimizer, epoch, stats, best_val_loss, backbone_name, embed_dim)
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
