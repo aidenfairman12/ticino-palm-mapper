@@ -70,12 +70,13 @@ def extract_all_features(
 
 
 def train_probe(
-    features: torch.Tensor, labels: torch.Tensor, embed_dim: int, epochs: int, lr: float
+    features: torch.Tensor, labels: torch.Tensor, embed_dim: int, epochs: int, lr: float,
+    pos_weight_multiplier: float = 1.0,
 ) -> nn.Linear:
     """Train a single nn.Linear(embed_dim, 1) classifier on precomputed
     features (no encoder involved at all here — pure feature -> label
     classification).
-    
+
     Returns the trained nn.Linear.
     """
     probe = nn.Linear(embed_dim, 1).to(features.device)
@@ -86,10 +87,13 @@ def train_probe(
     # was found to bias the boundary toward predicting "not palm" — recall collapsed
     # to ~50% while specificity sat at 96%. pos_weight rebalances the loss's gradient
     # contribution per class without discarding any hard negatives, unlike
-    # subsampling the negative pool would.
+    # subsampling the negative pool would. pos_weight_multiplier=1.0 (default) fully
+    # compensates for the imbalance and was found to overshoot the other direction
+    # (recall 90.6%, specificity 79.6%) — a fractional value (e.g. 0.5) lands at a
+    # more moderate point on the recall/specificity tradeoff instead of either extreme.
     n_pos = labels.sum()
     n_neg = labels.numel() - n_pos
-    pos_weight = n_neg / n_pos if n_pos > 0 else torch.tensor(1.0, device=labels.device)
+    pos_weight = pos_weight_multiplier * (n_neg / n_pos) if n_pos > 0 else torch.tensor(1.0, device=labels.device)
     loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     for epoch in range(epochs):
@@ -136,6 +140,7 @@ def leave_one_tile_out_cv(
     device: torch.device,
     epochs: int,
     lr: float,
+    pos_weight_multiplier: float = 1.0,
 ) -> dict:
     """Run leave-one-tile-out CV: for each unique tile that has at least
     one POSITIVE example, hold it out, train on everything else, evaluate
@@ -183,7 +188,7 @@ def leave_one_tile_out_cv(
       test_feat, test_label = features[test_mask], labels[test_mask]
       train_feat, train_lab = features[train_mask], labels[train_mask]
 
-      probe = train_probe(train_feat, train_lab, embed_dim, epochs, lr)
+      probe = train_probe(train_feat, train_lab, embed_dim, epochs, lr, pos_weight_multiplier)
 
       ret[tile_name] = evaluate_probe(probe, test_feat, test_label)
 
@@ -217,6 +222,13 @@ def parse_probe_args() -> argparse.Namespace:
     p.add_argument("--crop-size", type=int, default=224)
     p.add_argument("--epochs", type=int, default=200)
     p.add_argument("--lr", type=float, default=0.01)
+    p.add_argument(
+        "--pos-weight-multiplier", type=float, default=1.0,
+        help="Scales pos_weight relative to the full n_neg/n_pos ratio. 1.0 (default) "
+             "fully compensates for class imbalance and was found to overshoot toward "
+             "recall (90.6% recall / 79.6% specificity on the real bellinzona run); "
+             "try e.g. 0.5 for a more moderate point on the recall/specificity tradeoff.",
+    )
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
@@ -302,7 +314,7 @@ def main() -> None:
           f"({sum(1 for e in dataset.examples if e[3] == 1.0)} positive, "
           f"{sum(1 for e in dataset.examples if e[3] == 0.0)} negative)")
 
-    results = leave_one_tile_out_cv(model, dataset, device, args.epochs, args.lr)
+    results = leave_one_tile_out_cv(model, dataset, device, args.epochs, args.lr, args.pos_weight_multiplier)
 
     print(f"\n{len(results)} folds:")
     total_tp = total_tn = total_fp = total_fn = 0

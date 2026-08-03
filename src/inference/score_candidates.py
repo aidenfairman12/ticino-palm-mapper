@@ -55,13 +55,14 @@ def build_production_probe(
     embed_dim: int,
     epochs: int,
     lr: float,
+    pos_weight_multiplier: float = 1.0,
 ) -> nn.Linear:
     """Train one probe on ALL of `dataset` — no held-out fold. This is the
     real classifier used to score new candidates, as opposed to the CV
     probes in leave_one_tile_out_cv (which only exist to measure how well
     this approach generalizes, and are discarded after evaluation)."""
     features, labels, _ = extract_all_features(model, dataset, device)
-    return train_probe(features, labels, embed_dim, epochs, lr)
+    return train_probe(features, labels, embed_dim, epochs, lr, pos_weight_multiplier)
 
 
 def score_locations(
@@ -139,6 +140,11 @@ def parse_score_args() -> argparse.Namespace:
     p.add_argument("--crop-size", type=int, default=224)
     p.add_argument("--epochs", type=int, default=200)
     p.add_argument("--lr", type=float, default=0.01)
+    p.add_argument(
+        "--pos-weight-multiplier", type=float, default=1.0,
+        help="Scales pos_weight relative to the full n_neg/n_pos ratio — see "
+             "linear_probe.py's flag of the same name for the reasoning/tradeoff.",
+    )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--output", type=Path, default=Path("candidate_scores.geojson"))
     return p.parse_args()
@@ -211,7 +217,7 @@ def main() -> None:
           f"({sum(1 for e in dataset.examples if e[3] == 1.0)} positive, "
           f"{sum(1 for e in dataset.examples if e[3] == 0.0)} negative)")
 
-    probe = build_production_probe(model, dataset, device, embed_dim, args.epochs, args.lr)
+    probe = build_production_probe(model, dataset, device, embed_dim, args.epochs, args.lr, args.pos_weight_multiplier)
 
     # Pure unbiased random sampling — min_distance_m=0.0 makes
     # sample_negative_points' exclusion check a no-op (distance is never
