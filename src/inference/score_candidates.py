@@ -9,16 +9,25 @@ Workflow:
      (confirmed + scouted positives, sampled negatives) — no held-out fold,
      unlike leave_one_tile_out_cv, since this isn't an evaluation, it's the
      actual classifier we're about to use.
-  2. Sample --n-samples random locations across the given --tile-dirs'
-     combined footprint. Excludes a small buffer (--min-distance-m,
-     default 20m — negligible relative to a multi-km2 AOI, so this stays
-     effectively unbiased) around every already-reviewed point: the
-     original confirmed/scouted positives, plus (if provided) prior
-     active-learning rounds' confirmed positives and hard negatives.
-     Without this, repeat runs with a different --seed can still land on
-     or near locations you've already manually judged, wasting review
-     time on cards you've seen before.
-  3. Score every sampled location with the production probe.
+  2. Generate a systematic grid of candidate locations (--spacing-m apart)
+     across the given --tile-dirs' combined footprint, rather than i.i.d.
+     random draws. Palms are spatially sparse and clustered, so a modest
+     number of random samples essentially never lands near an undiscovered
+     one — coverage needs to be deliberate, not left to chance. Spacing
+     defaults to half the crop width so every location is within centering
+     distance of some grid point (a palm near the edge of a crop, rather
+     than centered, gets diluted by surrounding context in the pooled
+     feature — see score_locations). Excludes a --min-distance-m buffer
+     around every already-reviewed point: the original confirmed/scouted
+     positives, plus (if provided) prior active-learning rounds' confirmed
+     positives and hard negatives — otherwise a repeat run keeps
+     re-surfacing spots you've already manually judged. If the grid
+     produces more points than --n-samples, a seeded shuffle picks which
+     subset to score this run, so --seed still controls per-run scope.
+  3. Score every location with the production probe, batched
+     (--batch-size) rather than one at a time — necessary for a dense grid
+     to finish in a reasonable time; a few hundred random samples didn't
+     need this, hundreds of thousands of grid points do.
   4. Write out every scored location (sorted by predicted probability,
      highest first) to a GeoJSON for manual review — high-probability
      ones are the actual candidates worth looking at: either genuine
@@ -30,12 +39,14 @@ import argparse
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import timm
 import torch
 import torch.nn as nn
 from shapely.geometry import Point
 
+from src.data.config import PROJECT_CRS
 from src.data.dataset import load_confirmed_points, load_tile, normalize
 from src.data.probe_dataset import (
     PalmProbeDataset,
@@ -47,6 +58,47 @@ from src.data.probe_dataset import (
 from src.models.mae import MaskedAutoencoder, adapt_patch_embed
 from src.training.linear_probe import extract_all_features, train_probe
 from src.training.pretrain_ssl import glob_tiles
+
+
+def generate_grid_points(
+    tile_paths: list[Path],
+    spacing_m: float,
+    exclude_points: gpd.GeoSeries,
+    min_distance_m: float,
+) -> list[tuple[float, float]]:
+    """Systematic grid of (x, y) points, spacing_m apart, covering the
+    combined footprint of tile_paths — deliberate coverage instead of
+    leaving it to i.i.d. random draws, which essentially never land near a
+    spatially sparse, clustered feature like a palm across a large AOI.
+
+    Tile bounding envelopes combined can include gaps where no tile
+    actually exists (irregular AOI shape), so grid points are filtered
+    down to only those actually covered by at least one tile — same
+    reasoning as find_covering_tiles, done as a spatial join here since
+    it's over far more points than that per-point helper is meant for.
+
+    exclude_points/min_distance_m drop any grid point within min_distance_m
+    of an already-reviewed location (confirmed, scouted, prior
+    active-learning positives/hard-negatives), so repeat runs don't
+    re-surface spots already manually judged.
+    """
+    tile_boxes = load_tile_bounds(tile_paths)
+    boxes_gdf = gpd.GeoDataFrame(geometry=[b for _, b in tile_boxes], crs=PROJECT_CRS)
+    minx, miny, maxx, maxy = boxes_gdf.total_bounds
+
+    xs = np.arange(minx, maxx, spacing_m)
+    ys = np.arange(miny, maxy, spacing_m)
+    xx, yy = np.meshgrid(xs, ys)
+    grid_gdf = gpd.GeoDataFrame(geometry=gpd.points_from_xy(xx.ravel(), yy.ravel()), crs=PROJECT_CRS)
+
+    covered = gpd.sjoin(grid_gdf, boxes_gdf, predicate="within", how="inner")
+    covered = covered[~covered.index.duplicated()]  # one row per point, even if it's within >1 tile
+
+    if len(exclude_points) > 0:
+        exclusion_zone = exclude_points.buffer(min_distance_m).union_all()
+        covered = covered[~covered.geometry.within(exclusion_zone)]
+
+    return [(pt.x, pt.y) for pt in covered.geometry]
 
 
 def build_production_probe(
@@ -74,6 +126,7 @@ def score_locations(
     stats,
     crop_size: int,
     device: torch.device,
+    batch_size: int = 32,
 ) -> list[dict]:
     """Score every (x, y) in `locations` with `probe`, one result per
     location. Unlike PalmProbeDataset (which deliberately fans a labeled
@@ -98,26 +151,46 @@ def score_locations(
     point, and the location itself is skipped only if every covering tile
     is nodata there.
 
+    Two performance changes vs. scoring one location at a time (fine for a
+    few hundred random samples, impractical for a systematic grid that can
+    run into the hundreds of thousands): tiles are cached in memory as
+    they're loaded (a dense grid revisits the same handful of tiles
+    repeatedly — modest tile sizes here make caching all of them cheap
+    relative to re-reading from disk per point), and crops are batched
+    through the model instead of one forward pass per location.
+
     Returns predicted_prob via sigmoid(logit), so results can be
     sorted/thresholded meaningfully rather than just a hard 0/1."""
     model.eval()
-    results = []
 
     # Precompute once — reopening every tile's bounds per location (as the
     # old find_covering_tiles(point, tile_paths) signature required) would
-    # be wasteful at this scale (hundreds/thousands of scored locations).
+    # be wasteful at this scale.
     tile_boxes = load_tile_bounds(tile_paths)
+    tile_cache: dict[Path, tuple[np.ndarray, object]] = {}
 
+    def _load_tile_cached(path: Path) -> tuple[np.ndarray, object]:
+        if path not in tile_cache:
+            arr, transform, _ = load_tile(path)
+            tile_cache[path] = (arr, transform)
+        return tile_cache[path]
+
+    # Pass 1: resolve each location to a tile + crop (I/O-bound, not GPU work) —
+    # kept separate from the batched inference pass below so the two concerns
+    # (finding valid data, running the model) don't tangle together.
+    resolved: list[tuple[float, float, Path, np.ndarray]] = []
     n_skipped_nodata = 0
+    n_skipped_no_tile = 0
     for x, y in locations:
         point = Point(x, y)
         covering = find_covering_tiles(point, tile_boxes)
         if not covering:
+            n_skipped_no_tile += 1
             continue
 
         tile_path, raw_crop = None, None
         for candidate_tile in sorted(covering, key=lambda p: p.parent.name, reverse=True):
-            arr, transform, _ = load_tile(candidate_tile)
+            arr, transform = _load_tile_cached(candidate_tile)
             candidate_crop = crop_centered_on_point(arr, transform, point, crop_size)
             if (candidate_crop == 0).all(axis=0).mean() > 0.5:
                 continue  # mostly nodata at this point in this date's tile — try an older one
@@ -128,21 +201,25 @@ def score_locations(
             n_skipped_nodata += 1
             continue  # every covering tile is nodata at this point — unscoreable
 
-        crop = normalize(raw_crop, stats)
-
-        img = torch.from_numpy(crop).float().unsqueeze(0).to(device)
-        with torch.no_grad():
-            encoded = model.encode_full(img)
-            feature = encoded[0, 0].unsqueeze(0)
-            logit = probe(feature).squeeze(-1)
-            prob = torch.sigmoid(logit).item()
-
-        results.append({
-            "x": x, "y": y, "tile": tile_path.name, "predicted_prob": prob,
-        })
+        resolved.append((x, y, tile_path, normalize(raw_crop, stats)))
 
     if n_skipped_nodata:
         print(f"[warn] skipped {n_skipped_nodata} location(s) — nodata in every covering tile")
+    if n_skipped_no_tile:
+        print(f"[warn] skipped {n_skipped_no_tile} location(s) — no covering tile")
+
+    # Pass 2: batched inference.
+    results = []
+    for i in range(0, len(resolved), batch_size):
+        batch = resolved[i:i + batch_size]
+        imgs = torch.stack([torch.from_numpy(crop).float() for _, _, _, crop in batch]).to(device)
+        with torch.no_grad():
+            encoded = model.encode_full(imgs)
+            features = encoded[:, 0]  # CLS token, (B, D)
+            logits = probe(features).squeeze(-1)
+            probs = torch.sigmoid(logits).cpu().tolist()
+        for (x, y, tile_path, _), prob in zip(batch, probs):
+            results.append({"x": x, "y": y, "tile": tile_path.name, "predicted_prob": prob})
 
     return results
 
@@ -171,12 +248,27 @@ def parse_score_args() -> argparse.Namespace:
              "sampled for scoring, so a repeat run doesn't re-surface spots "
              "already confirmed as palms for review.",
     )
-    p.add_argument("--n-samples", type=int, default=500, help="Number of random locations to score.")
+    p.add_argument(
+        "--n-samples", type=int, default=500,
+        help="Max number of grid locations to score this run. The systematic grid "
+             "(see --spacing-m) is usually far larger than this — if so, a seeded "
+             "shuffle picks which subset to score, so --seed still controls scope "
+             "per run without needing multiple separate grids on disk.",
+    )
     p.add_argument("--n-negatives", type=int, default=30, help="Negatives for training the production probe.")
     p.add_argument("--min-distance-m", type=float, default=20.0)
+    p.add_argument(
+        "--spacing-m", type=float, default=11.0,
+        help="Grid spacing for the systematic candidate-location scan. Default is "
+             "half the crop width (crop covers ~22m at ~0.1m/px), so every location "
+             "is within centering distance of some grid point — a palm near the "
+             "edge of a crop rather than centered gets diluted by surrounding "
+             "context in the pooled feature, so under-spacing costs real recall.",
+    )
     p.add_argument("--crop-size", type=int, default=224)
     p.add_argument("--epochs", type=int, default=200)
     p.add_argument("--lr", type=float, default=0.01)
+    p.add_argument("--batch-size", type=int, default=32, help="Batch size for scoring inference.")
     p.add_argument(
         "--pos-weight-multiplier", type=float, default=1.0,
         help="Scales pos_weight relative to the full n_neg/n_pos ratio — see "
@@ -268,22 +360,25 @@ def main() -> None:
 
     probe = build_production_probe(model, dataset, device, embed_dim, args.epochs, args.lr, args.pos_weight_multiplier)
 
+    # Systematic grid instead of random draws — see module docstring for why.
     # Excludes a --min-distance-m buffer around every already-reviewed point
     # (positive_geoms already includes confirmed + scouted + reviewed-positives;
-    # none_signal + hard_neg_geoms covers GBIF-none and prior hard negatives) —
-    # negligible relative to a multi-km2 AOI, so this stays effectively unbiased
-    # coverage while avoiding re-surfacing spots already manually judged.
-    random_locations = sample_negative_points(
-        positive_points=positive_geoms,
-        candidate_points=pd.concat([none_signal.geometry, hard_neg_geoms], ignore_index=True),
-        tile_paths=tile_paths,
-        n_negatives=args.n_samples,
-        min_distance_m=args.min_distance_m,
-        seed=args.seed + 1,  # different seed than the training negatives
-    )
-    print(f"scoring {len(random_locations)} random locations...")
+    # none_signal + hard_neg_geoms covers GBIF-none and prior hard negatives).
+    already_reviewed = pd.concat([positive_geoms, none_signal.geometry, hard_neg_geoms], ignore_index=True)
+    grid_locations = generate_grid_points(tile_paths, args.spacing_m, already_reviewed, args.min_distance_m)
+    print(f"grid: {len(grid_locations)} candidate locations at {args.spacing_m}m spacing")
 
-    results = score_locations(model, probe, random_locations, tile_paths, stats, args.crop_size, device)
+    if len(grid_locations) > args.n_samples:
+        rng = np.random.default_rng(args.seed + 1)  # different seed than the training negatives
+        chosen_idx = rng.choice(len(grid_locations), size=args.n_samples, replace=False)
+        scored_locations = [grid_locations[i] for i in chosen_idx]
+    else:
+        scored_locations = grid_locations
+    print(f"scoring {len(scored_locations)} of them this run...")
+
+    results = score_locations(
+        model, probe, scored_locations, tile_paths, stats, args.crop_size, device, args.batch_size
+    )
 
     gdf = gpd.GeoDataFrame(
         results,
