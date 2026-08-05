@@ -29,13 +29,14 @@ apptainer exec --nv --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python -m src.training.linear_probe \
-        --checkpoint checkpoints_bellinzona/checkpoint_best.pt \
+        --checkpoint checkpoints_trial_maskratio/checkpoint_best.pt \
         --tile-dirs \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210324 \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210811 \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821 \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
-        --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson
+        --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
+        --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))
