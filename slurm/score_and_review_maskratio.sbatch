@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=palm-score-review
+#SBATCH --job-name=palm-score-review-maskratio
 #SBATCH --partition=gpu
 #SBATCH --account=gratis
 #SBATCH --qos=job_gratis
@@ -8,13 +8,18 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=05:00:00
-#SBATCH --output=logs/palm-score-review-%j.out
-#SBATCH --error=logs/palm-score-review-%j.err
+#SBATCH --output=logs/palm-score-review-maskratio-%j.out
+#SBATCH --error=logs/palm-score-review-maskratio-%j.err
 
-# Run from the repo root: sbatch slurm/score_and_review_bellinzona.sbatch
+# Same as score_and_review_bellinzona.sbatch but against the mask-ratio-0.5
+# run's checkpoint_best.pt, with its own output files so it doesn't
+# overwrite the small/0.75 run's candidate_scores.geojson / review page —
+# keeps both comparable.
+#
+# Run from the repo root: sbatch slurm/score_and_review_maskratio.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs candidate_review
+mkdir -p logs candidate_review_maskratio
 
 start_time=$SECONDS
 
@@ -35,14 +40,15 @@ apptainer exec --nv --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python -m src.inference.score_candidates \
-        --checkpoint checkpoints_bellinzona/checkpoint_best.pt \
+        --checkpoint checkpoints_trial_maskratio/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
         --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
         --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
         --n-samples 50 \
-        --output candidate_scores.geojson
+        --seed 123 \
+        --output candidate_scores_maskratio.geojson
 
 apptainer exec --cleanenv \
     --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
@@ -51,9 +57,9 @@ apptainer exec --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python scripts/11_review_candidates.py \
-        --candidates candidate_scores.geojson \
+        --candidates candidate_scores_maskratio.geojson \
         --tile-dirs "${TILE_DIRS[@]}" \
-        --output candidate_review/index.html
+        --output candidate_review_maskratio/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))
