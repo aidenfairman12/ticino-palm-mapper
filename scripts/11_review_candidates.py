@@ -240,6 +240,14 @@ def parse_review_args() -> argparse.Namespace:
     p.add_argument("--tile-dirs", type=Path, nargs="+", required=True, help="Same tile dirs used for scoring, to resolve full paths from filenames.")
     p.add_argument("--max-cards", type=int, default=60)
     p.add_argument("--min-prob", type=float, default=0.0, help="Only show candidates with predicted_prob >= this.")
+    p.add_argument(
+        "--offset", type=int, default=0,
+        help="Skip this many top-ranked candidates before taking --max-cards — lets "
+             "one big scored file (from a single expensive scoring pass) be reviewed "
+             "incrementally across multiple sessions without re-scoring: e.g. "
+             "--offset 60 for your second session's next batch after reviewing the "
+             "first 60, --offset 120 for the third, etc.",
+    )
     p.add_argument("--crop-size", type=int, default=224, help="Should match --crop-size used when scoring.")
     p.add_argument("--img-px", type=int, default=200, help="Display size (pixels) for each card's image.")
     p.add_argument("--output", type=Path, default=Path("candidate_review/index.html"))
@@ -251,8 +259,9 @@ def main() -> None:
 
     gdf = gpd.read_file(args.candidates).to_crs(PROJECT_CRS)
     gdf = gdf[gdf["predicted_prob"] >= args.min_prob].sort_values("predicted_prob", ascending=False)
-    gdf = gdf.head(args.max_cards)
-    print(f"=== reviewing {len(gdf)} candidates (of {len(gpd.read_file(args.candidates))} scored) ===")
+    gdf = gdf.iloc[args.offset:args.offset + args.max_cards]
+    print(f"=== reviewing {len(gdf)} candidates (offset {args.offset}, "
+          f"of {len(gpd.read_file(args.candidates))} scored) ===")
 
     tile_by_name = {}
     for d in args.tile_dirs:
@@ -264,7 +273,7 @@ def main() -> None:
     to_wgs = Transformer.from_crs(PROJECT_CRS, "EPSG:4326", always_xy=True)
 
     cards = []
-    for i, (_, row) in enumerate(gdf.iterrows(), 1):
+    for i, (_, row) in enumerate(gdf.iterrows(), args.offset + 1):
         tile_path = tile_by_name.get(row["tile"])
         if tile_path is None:
             print(f"[warn] tile not found for candidate #{i} ({row['tile']}) — skipping")
