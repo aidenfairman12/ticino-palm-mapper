@@ -79,12 +79,25 @@ def score_locations(
     location. Unlike PalmProbeDataset (which deliberately fans a labeled
     point out across every covering NIR-date tile for training diversity),
     here a location covered by multiple dates is scored on only the most
-    recent date's tile — this is a review/candidate list, so a single real-
-    world spot should appear as ONE card, not once per date it happens to
-    have extra coverage for. (Tile filenames are identical across date
-    directories — only the parent directory differs — so sorting covering
-    tiles by parent dir name and taking the last picks the newest date,
-    since feature_stack_rs_<YYYYMMDD> sorts chronologically as a string.)
+    recent date's tile that actually has real coverage there — this is a
+    review/candidate list, so a single real-world spot should appear as ONE
+    card, not once per date it happens to have extra coverage for. (Tile
+    filenames are identical across date directories — only the parent
+    directory differs — so sorting covering tiles by parent dir name picks
+    dates newest-first, since feature_stack_rs_<YYYYMMDD> sorts
+    chronologically as a string.)
+
+    Tile bounding boxes are rectangular, but the actual flight-strip/
+    delivery coverage within them can have real nodata gaps — a point can
+    fall inside a covering tile's bounds yet land on a patch of nothing.
+    Reading that produces an all-zero crop, which is both an unreviewable
+    black card AND a meaningless prediction (z-score normalizing all-zero
+    input just yields a constant, not "the model looked and found
+    nothing"). So each covering tile is tried newest-first, skipping ahead
+    to an older date if the newest one turns out to be nodata at this exact
+    point, and the location itself is skipped only if every covering tile
+    is nodata there.
+
     Returns predicted_prob via sigmoid(logit), so results can be
     sorted/thresholded meaningfully rather than just a hard 0/1."""
     model.eval()
@@ -95,16 +108,27 @@ def score_locations(
     # be wasteful at this scale (hundreds/thousands of scored locations).
     tile_boxes = load_tile_bounds(tile_paths)
 
+    n_skipped_nodata = 0
     for x, y in locations:
         point = Point(x, y)
         covering = find_covering_tiles(point, tile_boxes)
         if not covering:
             continue
-        tile_path = sorted(covering, key=lambda p: p.parent.name)[-1]
 
-        arr, transform, _ = load_tile(tile_path)
-        arr = normalize(arr, stats)
-        crop = crop_centered_on_point(arr, transform, point, crop_size)
+        tile_path, raw_crop = None, None
+        for candidate_tile in sorted(covering, key=lambda p: p.parent.name, reverse=True):
+            arr, transform, _ = load_tile(candidate_tile)
+            candidate_crop = crop_centered_on_point(arr, transform, point, crop_size)
+            if (candidate_crop == 0).all(axis=0).mean() > 0.5:
+                continue  # mostly nodata at this point in this date's tile — try an older one
+            tile_path, raw_crop = candidate_tile, candidate_crop
+            break
+
+        if tile_path is None:
+            n_skipped_nodata += 1
+            continue  # every covering tile is nodata at this point — unscoreable
+
+        crop = normalize(raw_crop, stats)
 
         img = torch.from_numpy(crop).float().unsqueeze(0).to(device)
         with torch.no_grad():
@@ -116,6 +140,9 @@ def score_locations(
         results.append({
             "x": x, "y": y, "tile": tile_path.name, "predicted_prob": prob,
         })
+
+    if n_skipped_nodata:
+        print(f"[warn] skipped {n_skipped_nodata} location(s) — nodata in every covering tile")
 
     return results
 

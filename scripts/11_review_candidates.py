@@ -59,7 +59,9 @@ def _crosshair(img: np.ndarray) -> np.ndarray:
     return img
 
 
-def _rgb_crop(tile_path: Path, point: Point, crop_size: int) -> tuple[np.ndarray, tuple[float, float, float, float]]:
+def _rgb_crop(
+    tile_path: Path, point: Point, crop_size: int
+) -> tuple[np.ndarray, tuple[float, float, float, float]] | None:
     """Load `tile_path`, crop centered on `point` (same clamped-offset logic
     as crop_centered_on_point), return an (H,W,3) uint8 RGB image with a
     per-channel percentile contrast stretch, plus the crop's real-world
@@ -67,6 +69,14 @@ def _rgb_crop(tile_path: Path, point: Point, crop_size: int) -> tuple[np.ndarray
     map a click on the displayed image back to a real-world coordinate
     (the scored point isn't always exactly on the palm; clicking lets the
     reviewer record where it actually is).
+
+    Returns None if the crop is mostly nodata — tile bounding boxes are
+    rectangular, but actual delivery coverage within them can have real
+    gaps, and a percentile contrast stretch over an all-zero region just
+    produces an unreviewable black card (same underlying issue
+    score_candidates.py's score_locations guards against on the scoring
+    side; this guards the display side, e.g. for candidates scored before
+    that fix existed).
     """
     arr, transform, _ = load_tile(tile_path)  # (C,H,W) raw values, NOT normalized
     H, W = arr.shape[1], arr.shape[2]
@@ -74,6 +84,9 @@ def _rgb_crop(tile_path: Path, point: Point, crop_size: int) -> tuple[np.ndarray
     row_start = max(0, min(rows_px - crop_size // 2, H - crop_size))
     col_start = max(0, min(cols_px - crop_size // 2, W - crop_size))
     crop = arr[:, row_start:row_start + crop_size, col_start:col_start + crop_size]
+
+    if (crop == 0).all(axis=0).mean() > 0.5:
+        return None
 
     x0, y0 = xy(transform, row_start, col_start, offset="ul")
     x1, y1 = xy(transform, row_start + crop_size, col_start + crop_size, offset="ul")
@@ -258,7 +271,11 @@ def main() -> None:
             continue
 
         point = Point(row.geometry.x, row.geometry.y)
-        rgb, (cxmin, cymin, cxmax, cymax) = _rgb_crop(tile_path, point, args.crop_size)
+        crop_result = _rgb_crop(tile_path, point, args.crop_size)
+        if crop_result is None:
+            print(f"[warn] candidate #{i} ({row['tile']}) is mostly nodata — skipping")
+            continue
+        rgb, (cxmin, cymin, cxmax, cymax) = crop_result
         rgb = _crosshair(rgb.copy())
 
         lon, lat = to_wgs.transform(row.geometry.x, row.geometry.y)
