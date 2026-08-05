@@ -10,18 +10,19 @@ Workflow:
      unlike leave_one_tile_out_cv, since this isn't an evaluation, it's the
      actual classifier we're about to use.
   2. Sample --n-samples random locations across the given --tile-dirs'
-     combined footprint — genuinely unbiased (no exclusion zones), since
-     the whole point is broad coverage, not "definitely safe" negatives.
+     combined footprint. Excludes a small buffer (--min-distance-m,
+     default 20m — negligible relative to a multi-km2 AOI, so this stays
+     effectively unbiased) around every already-reviewed point: the
+     original confirmed/scouted positives, plus (if provided) prior
+     active-learning rounds' confirmed positives and hard negatives.
+     Without this, repeat runs with a different --seed can still land on
+     or near locations you've already manually judged, wasting review
+     time on cards you've seen before.
   3. Score every sampled location with the production probe.
   4. Write out every scored location (sorted by predicted probability,
      highest first) to a GeoJSON for manual review — high-probability
      ones are the actual candidates worth looking at: either genuine
      unlabeled palms, or hard negatives that fooled the model.
-
-Reuses sample_negative_points for the random sampling step by passing
-min_distance_m=0.0 — since distance is never negative, this makes the
-exclusion check a no-op, giving pure unbiased random sampling without
-duplicating that logic.
 """
 from __future__ import annotations
 
@@ -131,8 +132,17 @@ def parse_score_args() -> argparse.Namespace:
         "--hard-negatives", type=Path, default=None,
         help="Optional path to active_learning_hard_negatives.geojson (from "
              "12_merge_review_verdicts.py) — added ON TOP of the --n-negatives random "
-             "negatives when training the production probe, same reasoning as "
-             "linear_probe.py's --hard-negatives.",
+             "negatives when training the production probe (same reasoning as "
+             "linear_probe.py's --hard-negatives), AND excluded from the random "
+             "locations sampled for scoring, so a repeat run doesn't re-surface "
+             "spots already confirmed as not-palm for review.",
+    )
+    p.add_argument(
+        "--reviewed-positives", type=Path, default=None,
+        help="Optional path to active_learning_confirmed_palms.geojson (from "
+             "12_merge_review_verdicts.py) — excluded from the random locations "
+             "sampled for scoring, so a repeat run doesn't re-surface spots "
+             "already confirmed as palms for review.",
     )
     p.add_argument("--n-samples", type=int, default=500, help="Number of random locations to score.")
     p.add_argument("--n-negatives", type=int, default=30, help="Negatives for training the production probe.")
@@ -196,6 +206,14 @@ def main() -> None:
         scouted = gpd.read_file(args.scouted_points)
         positive_geoms = pd.concat([positive_geoms, scouted.geometry], ignore_index=True)
 
+    # Active-learning positives confirmed in a PRIOR round feed back in as training
+    # positives too (same reasoning as --scouted-points) — without this, they'd only
+    # ever be used to exclude already-reviewed spots below, never to actually teach
+    # the production probe about them.
+    if args.reviewed_positives is not None:
+        reviewed_pos = gpd.read_file(args.reviewed_positives)
+        positive_geoms = pd.concat([positive_geoms, reviewed_pos.geometry], ignore_index=True)
+
     tile_paths = glob_tiles(args.tile_dirs, in_chans)
 
     negatives = sample_negative_points(
@@ -207,9 +225,13 @@ def main() -> None:
         seed=args.seed,
     )
 
+    # Empty by default so the random_locations exclusion below always has something
+    # to concatenate against, whether or not --hard-negatives was passed.
+    hard_neg_geoms = gpd.GeoSeries([], crs="EPSG:2056")
     if args.hard_negatives is not None:
         hard_neg = gpd.read_file(args.hard_negatives)
-        negatives = negatives + [(pt.x, pt.y) for pt in hard_neg.geometry]
+        hard_neg_geoms = hard_neg.geometry
+        negatives = negatives + [(pt.x, pt.y) for pt in hard_neg_geoms]
         print(f"negatives: {len(negatives) - len(hard_neg)} random + {len(hard_neg)} hard = {len(negatives)} total")
 
     dataset = PalmProbeDataset(positive_geoms, negatives, tile_paths, stats, args.crop_size)
@@ -219,15 +241,17 @@ def main() -> None:
 
     probe = build_production_probe(model, dataset, device, embed_dim, args.epochs, args.lr, args.pos_weight_multiplier)
 
-    # Pure unbiased random sampling — min_distance_m=0.0 makes
-    # sample_negative_points' exclusion check a no-op (distance is never
-    # negative), reusing it rather than duplicating the sampling logic.
+    # Excludes a --min-distance-m buffer around every already-reviewed point
+    # (positive_geoms already includes confirmed + scouted + reviewed-positives;
+    # none_signal + hard_neg_geoms covers GBIF-none and prior hard negatives) —
+    # negligible relative to a multi-km2 AOI, so this stays effectively unbiased
+    # coverage while avoiding re-surfacing spots already manually judged.
     random_locations = sample_negative_points(
         positive_points=positive_geoms,
-        candidate_points=none_signal.geometry,
+        candidate_points=pd.concat([none_signal.geometry, hard_neg_geoms], ignore_index=True),
         tile_paths=tile_paths,
         n_negatives=args.n_samples,
-        min_distance_m=0.0,
+        min_distance_m=args.min_distance_m,
         seed=args.seed + 1,  # different seed than the training negatives
     )
     print(f"scoring {len(random_locations)} random locations...")
