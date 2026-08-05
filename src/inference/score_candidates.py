@@ -36,6 +36,7 @@ Workflow:
 from __future__ import annotations
 
 import argparse
+import time
 from pathlib import Path
 
 import geopandas as gpd
@@ -289,6 +290,13 @@ def main() -> None:
     else:
         device = torch.device("cpu")
 
+    # Phase timing — printed at the end, so a small trial run's numbers can be used
+    # to extrapolate a full/near-full grid pass's runtime. Wall-clock alone conflates
+    # fixed costs (checkpoint load, production-probe training) with the part that
+    # actually scales with --n-samples (scoring), which would make a small trial's
+    # extrapolation pessimistic — so each phase is timed separately.
+    t_load_start = time.time()
+
     checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
     stats = checkpoint["stats"]
     in_chans = len(stats.mean)
@@ -353,12 +361,16 @@ def main() -> None:
         negatives = negatives + [(pt.x, pt.y) for pt in hard_neg_geoms]
         print(f"negatives: {len(negatives) - len(hard_neg)} random + {len(hard_neg)} hard = {len(negatives)} total")
 
+    t_load_end = time.time()
+
     dataset = PalmProbeDataset(positive_geoms, negatives, tile_paths, stats, args.crop_size)
     print(f"training production probe on {len(dataset)} examples "
           f"({sum(1 for e in dataset.examples if e[3] == 1.0)} positive, "
           f"{sum(1 for e in dataset.examples if e[3] == 0.0)} negative)")
 
     probe = build_production_probe(model, dataset, device, embed_dim, args.epochs, args.lr, args.pos_weight_multiplier)
+
+    t_probe_end = time.time()
 
     # Systematic grid instead of random draws — see module docstring for why.
     # Excludes a --min-distance-m buffer around every already-reviewed point
@@ -376,8 +388,18 @@ def main() -> None:
         scored_locations = grid_locations
     print(f"scoring {len(scored_locations)} of them this run...")
 
+    t_grid_end = time.time()
+
     results = score_locations(
         model, probe, scored_locations, tile_paths, stats, args.crop_size, device, args.batch_size
+    )
+
+    t_score_end = time.time()
+    ms_per_location = (t_score_end - t_grid_end) / len(scored_locations) * 1000 if scored_locations else 0.0
+    print(
+        f"timing — load: {t_load_end - t_load_start:.1f}s, probe train: {t_probe_end - t_load_end:.1f}s, "
+        f"grid gen: {t_grid_end - t_probe_end:.1f}s, scoring: {t_score_end - t_grid_end:.1f}s "
+        f"({ms_per_location:.2f} ms/location, fixed overhead excluded)"
     )
 
     gdf = gpd.GeoDataFrame(
