@@ -149,14 +149,14 @@ PAGE = """<!doctype html><meta charset="utf-8"><title>candidate review</title>
 <div id="toolbar">
   <button onclick="exportVerdicts()">Export verdicts (CSV)</button>
   <span id="progress">0 / {n} reviewed</span>
-  <span style="font-size:11px;color:#666">Click a card's image to focus it (P/N/U to verdict) — if the red crosshair isn't on the palm, click the actual palm instead, a blue dot marks the correction. Unlabeled cards are skipped on export.</span>
+  <span style="font-size:11px;color:#666">Click a card's image to focus it (P/N/U to verdict) — if the red crosshair isn't on the palm, click the actual palm(s) instead (each click adds a marker; multiple palms in one crop get multiple markers, exported as separate rows). Right-click an image to clear its markers. Unlabeled cards are skipped on export.</span>
 </div>
 <h1>candidate review — {n} locations</h1>
 <p style="font-size:12px;color:#aaa">{subtitle}</p>
 <div class="grid">{cards}</div>
 <script>
 const verdicts = {{}};
-const corrections = {{}};  // idx -> [world_x, world_y], only set once the reviewer clicks the image
+const markers = {{}};  // idx -> [[world_x, world_y], ...], accumulates across clicks (multiple palms in one crop)
 const TOTAL = {n};
 let focusedIdx = null;
 
@@ -179,10 +179,20 @@ function exportVerdicts() {{
   document.querySelectorAll('.card').forEach(card => {{
     const idx = card.dataset.idx;
     if (!(idx in verdicts)) return;
-    const corr = corrections[idx];
-    const cx = corr ? corr[0].toFixed(2) : card.dataset.x;
-    const cy = corr ? corr[1].toFixed(2) : card.dataset.y;
-    rows.push([idx, card.dataset.tile, card.dataset.x, card.dataset.y, cx, cy, card.dataset.prob, verdicts[idx]]);
+    const verdict = verdicts[idx];
+    const pts = markers[idx] || [];
+
+    // Multiple markers only matter for a palm verdict — each one is a separate
+    // real palm in the same crop, so each becomes its own row. A not_palm/unsure
+    // verdict always exports exactly one row (any markers clicked while figuring
+    // out the card don't create meaningless extra negative rows at the same spot).
+    if (verdict === 'palm' && pts.length > 0) {{
+      pts.forEach(([cx, cy]) => {{
+        rows.push([idx, card.dataset.tile, card.dataset.x, card.dataset.y, cx.toFixed(2), cy.toFixed(2), card.dataset.prob, verdict]);
+      }});
+    }} else {{
+      rows.push([idx, card.dataset.tile, card.dataset.x, card.dataset.y, card.dataset.x, card.dataset.y, card.dataset.prob, verdict]);
+    }}
   }});
   const csv = rows.map(r => r.join(',')).join('\\n');
   const blob = new Blob([csv], {{type: 'text/csv'}});
@@ -194,32 +204,46 @@ function exportVerdicts() {{
   URL.revokeObjectURL(url);
 }}
 
-// corrected_x/corrected_y default to the original scored point (x, y).
-// Clicking the image records where the palm actually is, in case the
-// scored/crosshair point is off by a few meters — the marker (blue dot)
-// gives visual confirmation of what was recorded.
+// corrected_x/corrected_y default to the original scored point (x, y) when no
+// marker has been placed. Clicking the image records where a palm actually is,
+// in case the scored/crosshair point is off by a few meters or there's more
+// than one palm in the crop — each click adds another marker (blue dot) rather
+// than replacing the previous one.
 document.querySelectorAll('.card').forEach(card => {{
   const img = card.querySelector('img');
   const wrap = card.querySelector('.imgwrap');
-  const marker = document.createElement('div');
-  marker.className = 'click-marker';
-  wrap.appendChild(marker);
+  const idx = card.dataset.idx;
+  markers[idx] = [];
+
+  function clearMarkers() {{
+    markers[idx] = [];
+    wrap.querySelectorAll('.click-marker').forEach(m => m.remove());
+  }}
 
   img.addEventListener('click', (e) => {{
-    focusedIdx = card.dataset.idx;
+    focusedIdx = idx;
 
     const rect = img.getBoundingClientRect();
     const fx = (e.clientX - rect.left) / rect.width;
     const fy = (e.clientY - rect.top) / rect.height;
+
+    const marker = document.createElement('div');
+    marker.className = 'click-marker';
     marker.style.left = (fx * 100) + '%';
     marker.style.top = (fy * 100) + '%';
     marker.style.display = 'block';
+    wrap.appendChild(marker);
 
     const xmin = parseFloat(card.dataset.cropxmin), xmax = parseFloat(card.dataset.cropxmax);
     const ymin = parseFloat(card.dataset.cropymin), ymax = parseFloat(card.dataset.cropymax);
     const worldX = xmin + fx * (xmax - xmin);
     const worldY = ymax - fy * (ymax - ymin);  // image y grows downward, world y grows upward
-    corrections[card.dataset.idx] = [worldX, worldY];
+    markers[idx].push([worldX, worldY]);
+  }});
+
+  img.addEventListener('contextmenu', (e) => {{
+    e.preventDefault();
+    clearMarkers();
   }});
 }});
 
