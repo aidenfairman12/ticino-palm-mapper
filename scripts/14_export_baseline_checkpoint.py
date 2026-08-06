@@ -54,7 +54,18 @@ def parse_export_args() -> argparse.Namespace:
     p.add_argument(
         "--tile-dirs", type=Path, nargs="+", required=True,
         help="Same tile-dirs used for the real pretraining run — determines the train split "
-             "(and therefore the normalization stats) the same way, so the comparison is apples-to-apples.",
+             "(and therefore the normalization stats) the same way, so the comparison is "
+             "apples-to-apples. Entirely unused (kept required just for a consistent CLI "
+             "shape) if --stats-from is given instead.",
+    )
+    p.add_argument(
+        "--stats-from", type=Path, default=None,
+        help="Optional: reuse the stats already saved in an existing checkpoint (e.g. "
+             "checkpoints_bellinzona/checkpoint_best.pt) instead of recomputing via "
+             "compute_channel_stats. Since the split params below match pretrain_ssl.py's "
+             "exactly, the same --tile-dirs would produce byte-identical stats anyway — this "
+             "just skips re-reading every train tile from disk to get there. Only valid if "
+             "--tile-dirs is the same set that checkpoint was actually trained on.",
     )
     p.add_argument("--in-chans", type=int, default=6, choices=[4, 6])
     p.add_argument("--model-size", type=str, default="small", choices=sorted(MODEL_CONFIGS))
@@ -78,10 +89,14 @@ def main() -> None:
 
     backbone_name, embed_dim = MODEL_CONFIGS[args.model_size]
 
-    tile_paths = glob_tiles(args.tile_dirs, args.in_chans)
-    train_paths, _, _ = spatial_split(tile_paths, args.val_frac, args.test_frac, args.block_size_m, args.seed)
-    stats = compute_channel_stats(train_paths)
-    print(f"computed stats over {len(train_paths)} train tiles (of {len(tile_paths)} total)")
+    if args.stats_from is not None:
+        stats = torch.load(args.stats_from, map_location="cpu", weights_only=False)["stats"]
+        print(f"reusing stats from {args.stats_from} — skipped recomputing over the train split")
+    else:
+        tile_paths = glob_tiles(args.tile_dirs, args.in_chans)
+        train_paths, _, _ = spatial_split(tile_paths, args.val_frac, args.test_frac, args.block_size_m, args.seed)
+        stats = compute_channel_stats(train_paths)
+        print(f"computed stats over {len(train_paths)} train tiles (of {len(tile_paths)} total)")
 
     model = build_model(
         backbone_name, args.in_chans, img_size=224, patch_size=14, embed_dim=embed_dim,
