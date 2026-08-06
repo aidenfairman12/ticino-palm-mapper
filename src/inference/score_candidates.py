@@ -36,7 +36,9 @@ Workflow:
 from __future__ import annotations
 
 import argparse
+import sys
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 import geopandas as gpd
@@ -119,6 +121,43 @@ def build_production_probe(
     return train_probe(features, labels, embed_dim, epochs, lr, pos_weight_multiplier)
 
 
+def _write_results(results: list[dict], output_path: Path) -> None:
+    """Write via a temp file + atomic rename, not directly to output_path.
+    This is called repeatedly through a run that can be time-limit-killed at
+    any moment — a plain to_file() could get interrupted mid-write and leave
+    output_path holding truncated/corrupt GeoJSON, which would then break
+    _load_prior_results() on the next resume attempt. os.replace (what
+    Path.replace uses) is atomic on POSIX as long as both paths are on the
+    same filesystem, which they are here.
+    """
+    gdf = gpd.GeoDataFrame(
+        results,
+        geometry=[Point(r["x"], r["y"]) for r in results],
+        crs="EPSG:2056",
+    )
+    gdf = gdf.sort_values("predicted_prob", ascending=False)
+    tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    gdf.to_file(tmp_path, driver="GeoJSON")
+    tmp_path.replace(output_path)
+
+
+def _load_prior_results(output_path: Path) -> tuple[list[dict], set[tuple[float, float]]]:
+    """Load a previous (possibly truncated, e.g. by a time-limit kill)
+    --output file, if one exists, so a resumed run can skip locations
+    already scored instead of starting the whole grid over. Coordinates are
+    rounded before going into the skip-set since they round-trip through
+    GeoJSON text serialization, not compared as exact floats.
+    """
+    if not output_path.exists():
+        return [], set()
+
+    prior_gdf = gpd.read_file(output_path)
+    prior_results = prior_gdf.drop(columns="geometry").to_dict("records")
+    already_scored = {(round(r["x"], 3), round(r["y"], 3)) for r in prior_results}
+    print(f"resuming from {output_path}: {len(already_scored)} location(s) already scored")
+    return prior_results, already_scored
+
+
 def score_locations(
     model: MaskedAutoencoder,
     probe: nn.Linear,
@@ -128,6 +167,9 @@ def score_locations(
     crop_size: int,
     device: torch.device,
     batch_size: int = 32,
+    prior_results: list[dict] | None = None,
+    output_path: Path | None = None,
+    flush_every: int = 5000,
 ) -> list[dict]:
     """Score every (x, y) in `locations` with `probe`, one result per
     location. Unlike PalmProbeDataset (which deliberately fans a labeled
@@ -161,27 +203,82 @@ def score_locations(
     through the model instead of one forward pass per location.
 
     Returns predicted_prob via sigmoid(logit), so results can be
-    sorted/thresholded meaningfully rather than just a hard 0/1."""
+    sorted/thresholded meaningfully rather than just a hard 0/1.
+
+    If `output_path` is given, `prior_results` (already-scored locations from
+    an earlier, possibly time-limit-truncated run against this same output
+    file — see _load_prior_results) plus everything scored so far this run
+    are flushed to `output_path` every `flush_every` locations. Unlike
+    pretrain_ssl.py's epoch checkpoints, there's no separate resumable state
+    to save — the output file itself IS the checkpoint, since `locations` is
+    regenerated deterministically from the same CLI args on every run (see
+    main()) and resuming just means skipping whatever's already in it. A job
+    killed mid-run this way loses at most `flush_every` locations of
+    progress, not the whole run.
+    """
     model.eval()
+    t_start = time.time()
 
     # Precompute once — reopening every tile's bounds per location (as the
     # old find_covering_tiles(point, tile_paths) signature required) would
     # be wasteful at this scale.
     tile_boxes = load_tile_bounds(tile_paths)
-    tile_cache: dict[Path, tuple[np.ndarray, object]] = {}
+
+    # Bounded LRU, NOT a plain dict — each 6-band 1024x1024 float32 tile is
+    # ~25MB, and a full systematic grid over this AOI touches most/all of the
+    # ~11.8k tiles across all date dirs combined. An unbounded cache here is
+    # what OOM-killed every attempt at the real full run (32GB job, ~290GB if
+    # every tile got cached). 150 tiles is a ~3.75GB ceiling — a large margin
+    # under 32GB even alongside the model/probe/batch tensors, while still
+    # capturing the locality benefit: the grid is walked in raster-scan
+    # order (see generate_grid_points — not shuffled unless --n-samples
+    # subsamples it), so nearby grid points revisit the same handful of
+    # tiles in clusters, not randomly across the whole AOI.
+    max_cached_tiles = 150
+    tile_cache: OrderedDict[Path, tuple[np.ndarray, object]] = OrderedDict()
 
     def _load_tile_cached(path: Path) -> tuple[np.ndarray, object]:
-        if path not in tile_cache:
-            arr, transform, _ = load_tile(path)
-            tile_cache[path] = (arr, transform)
+        if path in tile_cache:
+            tile_cache.move_to_end(path)
+            return tile_cache[path]
+        arr, transform, _ = load_tile(path)
+        tile_cache[path] = (arr, transform)
+        if len(tile_cache) > max_cached_tiles:
+            tile_cache.popitem(last=False)
         return tile_cache[path]
 
-    # Pass 1: resolve each location to a tile + crop (I/O-bound, not GPU work) —
-    # kept separate from the batched inference pass below so the two concerns
-    # (finding valid data, running the model) don't tangle together.
-    resolved: list[tuple[float, float, Path, np.ndarray]] = []
+    # Single streaming pass: resolve each location to a tile + crop, buffer
+    # up to batch_size of them, then run inference on that batch immediately
+    # — NOT "resolve every location in `locations` into a `resolved` list,
+    # then batch through it," which used to hold one full (6, 224, 224)
+    # float32 crop (~1.2MB) per PENDING location simultaneously. At full
+    # systematic-grid scale (~500k locations) that's ~600GB of crops sitting
+    # in memory before a single inference batch ran — this, combined with
+    # the unbounded tile cache below, is what OOM-killed every attempt at
+    # the real full run before it ever printed a progress line. Bounding the
+    # in-flight buffer to batch_size keeps peak memory for crops at
+    # batch_size * ~1.2MB regardless of how large `locations` is.
+    results = list(prior_results) if prior_results else []
+    since_last_flush = 0
     n_skipped_nodata = 0
     n_skipped_no_tile = 0
+    pending: list[tuple[float, float, Path, np.ndarray]] = []
+
+    def _run_pending_batch() -> None:
+        nonlocal since_last_flush
+        if not pending:
+            return
+        imgs = torch.stack([torch.from_numpy(crop).float() for _, _, _, crop in pending]).to(device)
+        with torch.no_grad():
+            encoded = model.encode_full(imgs)
+            features = encoded[:, 0]  # CLS token, (B, D)
+            logits = probe(features).squeeze(-1)
+            probs = torch.sigmoid(logits).cpu().tolist()
+        for (x, y, tile_path, _), prob in zip(pending, probs):
+            results.append({"x": x, "y": y, "tile": tile_path.name, "predicted_prob": prob})
+        since_last_flush += len(pending)
+        pending.clear()
+
     for x, y in locations:
         point = Point(x, y)
         covering = find_covering_tiles(point, tile_boxes)
@@ -202,25 +299,29 @@ def score_locations(
             n_skipped_nodata += 1
             continue  # every covering tile is nodata at this point — unscoreable
 
-        resolved.append((x, y, tile_path, normalize(raw_crop, stats)))
+        pending.append((x, y, tile_path, normalize(raw_crop, stats)))
+
+        if len(pending) >= batch_size:
+            _run_pending_batch()
+            if output_path is not None and since_last_flush >= flush_every:
+                _write_results(results, output_path)
+                elapsed = time.time() - t_start
+                rate = (len(results) - len(prior_results or [])) / elapsed if elapsed > 0 else 0.0
+                print(
+                    f"flushed {len(results)} total scored ({len(results) - len(prior_results or [])} this run, "
+                    f"{elapsed/60:.1f} min elapsed, {rate:.1f} locations/s) -> {output_path}"
+                )
+                since_last_flush = 0
+
+    _run_pending_batch()  # leftover partial batch smaller than batch_size
 
     if n_skipped_nodata:
         print(f"[warn] skipped {n_skipped_nodata} location(s) — nodata in every covering tile")
     if n_skipped_no_tile:
         print(f"[warn] skipped {n_skipped_no_tile} location(s) — no covering tile")
 
-    # Pass 2: batched inference.
-    results = []
-    for i in range(0, len(resolved), batch_size):
-        batch = resolved[i:i + batch_size]
-        imgs = torch.stack([torch.from_numpy(crop).float() for _, _, _, crop in batch]).to(device)
-        with torch.no_grad():
-            encoded = model.encode_full(imgs)
-            features = encoded[:, 0]  # CLS token, (B, D)
-            logits = probe(features).squeeze(-1)
-            probs = torch.sigmoid(logits).cpu().tolist()
-        for (x, y, tile_path, _), prob in zip(batch, probs):
-            results.append({"x": x, "y": y, "tile": tile_path.name, "predicted_prob": prob})
+    if output_path is not None and since_last_flush > 0:
+        _write_results(results, output_path)  # final partial flush so the last <flush_every don't get lost
 
     return results
 
@@ -281,6 +382,15 @@ def parse_score_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    # SLURM output is redirected to a file, so Python's default is fully
+    # buffered, not line-buffered — every print() below (including inside
+    # score_locations's periodic flushes) could sit unwritten until process
+    # exit. That's exactly what made the OOM kills that motivated this
+    # function hard to diagnose: three ~1h runs, zero progress lines in any
+    # of their logs, even though a lot had almost certainly already
+    # happened by the time each was killed.
+    sys.stdout.reconfigure(line_buffering=True)
+
     args = parse_score_args()
 
     if torch.cuda.is_available():
@@ -390,28 +500,41 @@ def main() -> None:
 
     t_grid_end = time.time()
 
+    # Resume support: score_locations/main() are re-run wholesale on a chained
+    # follow-up job rather than restarting a saved model/optimizer like
+    # pretrain_ssl.py — but scored_locations is deterministic given the same
+    # CLI args (grid + seeded subsample), so a resumed run reproduces the
+    # exact same target list and just needs to skip whatever's already in
+    # args.output from a prior, possibly time-limit-truncated attempt.
+    prior_results, already_scored = _load_prior_results(args.output)
+    locations_to_score = [
+        loc for loc in scored_locations
+        if (round(loc[0], 3), round(loc[1], 3)) not in already_scored
+    ]
+    n_already_done = len(scored_locations) - len(locations_to_score)
+    if n_already_done:
+        print(f"{n_already_done} of {len(scored_locations)} target location(s) already scored, "
+              f"{len(locations_to_score)} remaining this run")
+
     results = score_locations(
-        model, probe, scored_locations, tile_paths, stats, args.crop_size, device, args.batch_size
+        model, probe, locations_to_score, tile_paths, stats, args.crop_size, device, args.batch_size,
+        prior_results=prior_results, output_path=args.output,
     )
 
     t_score_end = time.time()
-    ms_per_location = (t_score_end - t_grid_end) / len(scored_locations) * 1000 if scored_locations else 0.0
+    ms_per_location = (
+        (t_score_end - t_grid_end) / len(locations_to_score) * 1000 if locations_to_score else 0.0
+    )
     print(
         f"timing — load: {t_load_end - t_load_start:.1f}s, probe train: {t_probe_end - t_load_end:.1f}s, "
         f"grid gen: {t_grid_end - t_probe_end:.1f}s, scoring: {t_score_end - t_grid_end:.1f}s "
-        f"({ms_per_location:.2f} ms/location, fixed overhead excluded)"
+        f"({ms_per_location:.2f} ms/location, fixed overhead excluded, {len(locations_to_score)} newly scored)"
     )
 
-    gdf = gpd.GeoDataFrame(
-        results,
-        geometry=[Point(r["x"], r["y"]) for r in results],
-        crs="EPSG:2056",
-    )
-    gdf = gdf.sort_values("predicted_prob", ascending=False)
-    gdf.to_file(args.output, driver="GeoJSON")
-
-    n_flagged = (gdf["predicted_prob"] > 0.5).sum()
-    print(f"wrote {len(gdf)} scored locations -> {args.output}")
+    # score_locations already flushed results (prior + new) to args.output as it
+    # went — nothing left to write here.
+    n_flagged = sum(1 for r in results if r["predicted_prob"] > 0.5)
+    print(f"wrote {len(results)} scored locations -> {args.output}")
     print(f"{n_flagged} flagged as predicted-positive (prob > 0.5) — review these first")
 
 

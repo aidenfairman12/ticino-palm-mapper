@@ -34,6 +34,10 @@ data/interim/labels/*
 *.pt
 *.ckpt
 
+# full-grid scoring output — regenerable (sbatch slurm/score_and_review_full.sbatch),
+# hundreds of thousands of rows, exceeds GitHub's 100MB file size limit
+candidate_scores_full.geojson
+
 # built containers / job logs
 *.sif
 logs/

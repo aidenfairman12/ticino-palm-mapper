@@ -7,9 +7,7 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-# TODO: set from slurm/score_timing_trial.sbatch's ms/location figure —
-# (ms_per_location * N_SAMPLES below) / 1000 / 60 / 60 hours, plus margin.
-#SBATCH --time=00:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/palm-score-review-full-%j.out
 #SBATCH --error=logs/palm-score-review-full-%j.err
 
@@ -18,26 +16,30 @@
 # review session — see 11_review_candidates.py's --offset flag for reviewing
 # this same output incrementally across many sessions without re-scoring.
 #
-# Two things MUST be filled in below before submitting — left as visible
-# placeholders rather than silently defaulting to something that would run
-# but be wrong:
-#   1. CHECKPOINT — blocked on the pos_weight=1.0 reproducibility rerun
-#      (comparing checkpoints_bellinzona/checkpoint_best.pt, val_loss=0.0918,
-#      against checkpoints_trial_maskratio/checkpoint_best.pt, val_loss=0.0666)
-#      resolving which checkpoint's downstream linear-probe numbers actually
-#      hold up. Don't run this against a checkpoint that regression might
-#      rule out.
-#   2. N_SAMPLES / --time above — set N_SAMPLES to what you're willing to
-#      commit compute to (up to the real grid size, printed by this script
-#      itself as "grid: N candidate locations"), THEN run
-#      score_timing_trial.sbatch (if you haven't already) and use its
-#      ms/location figure to size --time with real margin, not a guess.
+# score_candidates.py now resumes from --output if it already exists (skips
+# already-scored locations, deterministic grid/subsample means a re-run
+# reproduces the same target list) and flushes progress to disk every
+# --flush-every locations instead of only writing once at the end — so unlike
+# the original one-shot version of this script, a 24h time-limit kill loses
+# at most one flush interval of progress, not the whole run. That makes SLURM
+# job chaining actually safe/useful here; see the sbatch submission for it.
 #
-# Run from the repo root: sbatch slurm/score_and_review_full.sbatch
+# CHECKPOINT is not gated on the pos_weight=1.0 reproducibility rerun anymore
+# (deprioritized — see conversation) — currently pointed at the small/0.75
+# real run's checkpoint_best.pt (val_loss=0.0918).
+#
+# N_SAMPLES is set well above the real grid size (printed each run as "grid:
+# N candidate locations at ...m spacing") specifically so no subsampling
+# happens and the entire grid gets scored — exact grid size isn't known yet
+# (timing trial hasn't finished), so this errs high rather than guessing low
+# and silently leaving part of the AOI unscored.
+#
+# Run from the repo root: sbatch --dependency=afterany:<prev_jobid> slurm/score_and_review_full.sbatch
+# (see chain submission notes in conversation — first submission needs no --dependency)
 mkdir -p logs candidate_review_full
 
-CHECKPOINT="TODO_set_this_checkpoint_path.pt"
-N_SAMPLES=0  # TODO: set from the timing trial + your time budget
+CHECKPOINT="checkpoints_bellinzona/checkpoint_best.pt"
+N_SAMPLES=2000000  # safely above the real grid size (~500k ballpark) so the full grid gets scored, not a subsample
 
 start_time=$SECONDS
 
