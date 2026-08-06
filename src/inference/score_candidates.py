@@ -112,13 +112,14 @@ def build_production_probe(
     epochs: int,
     lr: float,
     pos_weight_multiplier: float = 1.0,
-) -> nn.Linear:
+    hidden_dim: int = 0,
+) -> nn.Module:
     """Train one probe on ALL of `dataset` — no held-out fold. This is the
     real classifier used to score new candidates, as opposed to the CV
     probes in leave_one_tile_out_cv (which only exist to measure how well
     this approach generalizes, and are discarded after evaluation)."""
     features, labels, _ = extract_all_features(model, dataset, device)
-    return train_probe(features, labels, embed_dim, epochs, lr, pos_weight_multiplier)
+    return train_probe(features, labels, embed_dim, epochs, lr, pos_weight_multiplier, hidden_dim)
 
 
 def _write_results(results: list[dict], output_path: Path) -> None:
@@ -376,6 +377,11 @@ def parse_score_args() -> argparse.Namespace:
         help="Scales pos_weight relative to the full n_neg/n_pos ratio — see "
              "linear_probe.py's flag of the same name for the reasoning/tradeoff.",
     )
+    p.add_argument(
+        "--hidden-dim", type=int, default=0,
+        help="0 (default) trains a plain linear probe. >0 trains a small MLP head "
+             "instead — see linear_probe.py's flag of the same name for the reasoning.",
+    )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--output", type=Path, default=Path("candidate_scores.geojson"))
     return p.parse_args()
@@ -478,7 +484,9 @@ def main() -> None:
           f"({sum(1 for e in dataset.examples if e[3] == 1.0)} positive, "
           f"{sum(1 for e in dataset.examples if e[3] == 0.0)} negative)")
 
-    probe = build_production_probe(model, dataset, device, embed_dim, args.epochs, args.lr, args.pos_weight_multiplier)
+    probe = build_production_probe(
+        model, dataset, device, embed_dim, args.epochs, args.lr, args.pos_weight_multiplier, args.hidden_dim
+    )
 
     t_probe_end = time.time()
 

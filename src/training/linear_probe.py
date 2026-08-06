@@ -72,14 +72,35 @@ def extract_all_features(
 def train_probe(
     features: torch.Tensor, labels: torch.Tensor, embed_dim: int, epochs: int, lr: float,
     pos_weight_multiplier: float = 1.0,
-) -> nn.Linear:
-    """Train a single nn.Linear(embed_dim, 1) classifier on precomputed
-    features (no encoder involved at all here — pure feature -> label
-    classification).
+    hidden_dim: int = 0,
+) -> nn.Module:
+    """Train a classifier on precomputed features (no encoder involved at all
+    here — pure feature -> label classification).
 
-    Returns the trained nn.Linear.
+    hidden_dim=0 (default) trains a plain nn.Linear(embed_dim, 1), same as
+    before. hidden_dim>0 instead trains a small one-hidden-layer MLP
+    (embed_dim -> hidden_dim -> 1, ReLU + dropout) — a minimal, cheap test of
+    whether the frozen features need a mildly non-linear boundary rather than
+    a straight hyperplane. Kept small and regularized (dropout=0.3) since the
+    labeled dataset is tiny (a few hundred examples after tile fan-out,
+    spread thin across leave-one-tile-out folds) — a bigger head risks
+    overfitting rather than finding real structure. Watch for the CV numbers
+    getting LESS stable (wider fold-to-fold swings) than the linear probe —
+    that's the overfitting signature, not evidence this helped.
+
+    Returns the trained nn.Module (nn.Linear or nn.Sequential depending on
+    hidden_dim) — evaluate_probe and everything downstream just calls it,
+    indifferent to which.
     """
-    probe = nn.Linear(embed_dim, 1).to(features.device)
+    if hidden_dim > 0:
+        probe = nn.Sequential(
+            nn.Linear(embed_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(hidden_dim, 1),
+        ).to(features.device)
+    else:
+        probe = nn.Linear(embed_dim, 1).to(features.device)
     optimizer = torch.optim.Adam(probe.parameters(), lr=lr)
 
     # Negatives outnumber positives (~3:1 with hard negatives included, since they
@@ -108,7 +129,7 @@ def train_probe(
 
 
 def evaluate_probe(
-    probe: nn.Linear, features: torch.Tensor, labels: torch.Tensor
+    probe: nn.Module, features: torch.Tensor, labels: torch.Tensor
 ) -> dict:
     """Evaluate a trained probe on held-out features/labels.
     """
@@ -141,6 +162,7 @@ def leave_one_tile_out_cv(
     epochs: int,
     lr: float,
     pos_weight_multiplier: float = 1.0,
+    hidden_dim: int = 0,
 ) -> dict:
     """Run leave-one-tile-out CV: for each unique tile that has at least
     one POSITIVE example, hold it out, train on everything else, evaluate
@@ -188,7 +210,7 @@ def leave_one_tile_out_cv(
       test_feat, test_label = features[test_mask], labels[test_mask]
       train_feat, train_lab = features[train_mask], labels[train_mask]
 
-      probe = train_probe(train_feat, train_lab, embed_dim, epochs, lr, pos_weight_multiplier)
+      probe = train_probe(train_feat, train_lab, embed_dim, epochs, lr, pos_weight_multiplier, hidden_dim)
 
       ret[tile_name] = evaluate_probe(probe, test_feat, test_label)
 
@@ -235,6 +257,14 @@ def parse_probe_args() -> argparse.Namespace:
              "fully compensates for class imbalance and was found to overshoot toward "
              "recall (90.6% recall / 79.6% specificity on the real bellinzona run); "
              "try e.g. 0.5 for a more moderate point on the recall/specificity tradeoff.",
+    )
+    p.add_argument(
+        "--hidden-dim", type=int, default=0,
+        help="0 (default) trains a plain linear probe. >0 (e.g. 32) instead trains a "
+             "small one-hidden-layer MLP (embed_dim -> hidden_dim -> 1) on the frozen "
+             "features, testing whether the boundary needs mild non-linearity rather "
+             "than a straight hyperplane. Keep small given the tiny labeled dataset — "
+             "a bigger value risks overfitting rather than finding real signal.",
     )
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
@@ -328,7 +358,9 @@ def main() -> None:
           f"({sum(1 for e in dataset.examples if e[3] == 1.0)} positive, "
           f"{sum(1 for e in dataset.examples if e[3] == 0.0)} negative)")
 
-    results = leave_one_tile_out_cv(model, dataset, device, args.epochs, args.lr, args.pos_weight_multiplier)
+    results = leave_one_tile_out_cv(
+        model, dataset, device, args.epochs, args.lr, args.pos_weight_multiplier, args.hidden_dim
+    )
 
     print(f"\n{len(results)} folds:")
     total_tp = total_tn = total_fp = total_fn = 0
