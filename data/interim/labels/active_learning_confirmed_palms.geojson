@@ -5,6 +5,16 @@
 "features": [
 { "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c071_r050_nirchm.tif", "predicted_prob_at_review": 0.8687, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2721508.799999999813735, 1115662.91 ] } },
 { "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c021_r076_nirchm.tif", "predicted_prob_at_review": 0.8672, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2717018.46, 1113325.46 ] } },
-{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c021_r076_nirchm.tif", "predicted_prob_at_review": 0.774, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2717018.680000000167638, 1113325.91 ] } }
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c021_r076_nirchm.tif", "predicted_prob_at_review": 0.774, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2717018.680000000167638, 1113325.91 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c055_r051_nirchm.tif", "predicted_prob_at_review": 0.8955, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2720066.990000000223517, 1115519.95 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c058_r049_nirchm.tif", "predicted_prob_at_review": 0.8916, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2720330.740000000223517, 1115693.31 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c048_r049_nirchm.tif", "predicted_prob_at_review": 0.8909, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2719454.910000000149012, 1115691.85 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c020_r088_nirchm.tif", "predicted_prob_at_review": 0.89, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2716984.5, 1112266.19 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c061_r074_nirchm.tif", "predicted_prob_at_review": 0.8882, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2720648.17, 1113448.94 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c050_r050_nirchm.tif", "predicted_prob_at_review": 0.8868, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2719633.71, 1115617.04 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c054_r046_nirchm.tif", "predicted_prob_at_review": 0.8842, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2719987.299999999813735, 1115965.57 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c065_r068_nirchm.tif", "predicted_prob_at_review": 0.8841, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2720940.69, 1114001.17 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c058_r050_nirchm.tif", "predicted_prob_at_review": 0.8823, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2720384.4, 1115650.889999999897555 ] } },
+{ "type": "Feature", "properties": { "tile": "bellinzona_full_nir_2024_c050_r050_nirchm.tif", "predicted_prob_at_review": 0.8814, "source": "active_learning" }, "geometry": { "type": "Point", "coordinates": [ 2719634.069999999832362, 1115618.77 ] } }
 ]
 }
