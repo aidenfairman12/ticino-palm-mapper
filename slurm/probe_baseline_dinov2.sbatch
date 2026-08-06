@@ -1,0 +1,69 @@
+#!/bin/bash
+#SBATCH --job-name=palm-probe-baseline-dinov2
+#SBATCH --partition=gpu
+#SBATCH --account=gratis
+#SBATCH --qos=job_gratis
+#SBATCH --gres=gpu:rtx4090:1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32G
+#SBATCH --time=02:00:00
+#SBATCH --output=logs/palm-probe-baseline-dinov2-%j.out
+#SBATCH --error=logs/palm-probe-baseline-dinov2-%j.err
+
+# Exports a plain-pretrained-DINOv2 checkpoint (no continued MAE pretraining
+# on domain imagery at all — see scripts/14_export_baseline_checkpoint.py's
+# docstring) and runs the same linear-probe eval against it, to check
+# whether the continued pretraining in checkpoints_bellinzona/ actually
+# helped linear-probe performance or hurt it (MAE reconstruction is
+# documented to sometimes produce less linearly-separable features than
+# DINOv2's original contrastive objective). Compare this job's accuracy
+# numbers against job 11498941 (checkpoints_bellinzona, pos_weight_multiplier
+# default) — see README.md's "SSL checkpoints" section for that baseline.
+#
+# Run from the repo root: sbatch slurm/probe_baseline_dinov2.sbatch
+# Assumes ticino-palm.sif has already been built via:
+#   apptainer build --fakeroot ticino-palm.sif apptainer.def
+mkdir -p logs checkpoints_baseline_dinov2
+
+start_time=$SECONDS
+
+TILE_DIRS=(
+    /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210324
+    /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210811
+    /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821
+)
+
+# See train_ssl_bellinzona.sbatch: `import timm` loads its own libjpeg before
+# rasterio does, and the incompatible copy wins the SONAME slot, breaking
+# rasterio's libtiff link. Preload the correct libjpeg so it claims the slot
+# first, regardless of import order.
+apptainer exec --nv --cleanenv \
+    --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
+    --bind "$(pwd)":/workspace \
+    --bind /rs_scratch:/rs_scratch \
+    --pwd /workspace \
+    ticino-palm.sif \
+    python scripts/14_export_baseline_checkpoint.py \
+        --tile-dirs "${TILE_DIRS[@]}" \
+        --in-chans 6 \
+        --stats-from checkpoints_bellinzona/checkpoint_best.pt \
+        --output checkpoints_baseline_dinov2/checkpoint_best.pt
+
+apptainer exec --nv --cleanenv \
+    --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
+    --bind "$(pwd)":/workspace \
+    --bind /rs_scratch:/rs_scratch \
+    --pwd /workspace \
+    ticino-palm.sif \
+    python -m src.training.linear_probe \
+        --checkpoint checkpoints_baseline_dinov2/checkpoint_best.pt \
+        --tile-dirs "${TILE_DIRS[@]}" \
+        --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
+        --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
+        --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
+        --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
+        --pos-weight-multiplier "${POS_WEIGHT_MULT:-1.0}"
+
+elapsed=$((SECONDS - start_time))
+printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

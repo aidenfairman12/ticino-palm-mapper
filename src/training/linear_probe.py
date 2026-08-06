@@ -242,6 +242,8 @@ def parse_probe_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_probe_args()
+    print(f"pos-weight-multiplier: {args.pos_weight_multiplier} "
+          f"(scales pos_weight relative to the full n_neg/n_pos ratio per fold)")
 
     if torch.cuda.is_available():
         device = torch.device("cuda")
