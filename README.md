@@ -120,6 +120,32 @@ swisstopo free geodata (incl. SWISSIMAGE) may be used, processed, and used
 commercially **with mandatory source citation**. Cite swisstopo. Check Info Flora's
 terms for the occurrence data before any redistribution.
 
+## SSL checkpoints
+
+`checkpoints_bellinzona/checkpoint_best.pt` (small backbone, mask-ratio 0.75, epoch
+148, SSL val_loss 0.0918) is the checkpoint currently in use for the linear
+probe / active-learning scoring pipeline — **not**
+`checkpoints_trial_maskratio/checkpoint_best.pt` (small backbone, mask-ratio
+0.5, epoch 137, SSL val_loss 0.0647), despite the latter reaching a lower SSL
+reconstruction loss.
+
+The reason: lower SSL val_loss didn't translate to better downstream
+performance. Comparing the two on `src/training/linear_probe.py`'s
+leave-one-tile-out CV (default `--pos-weight-multiplier`):
+
+| checkpoint | SSL val_loss | mean per-fold accuracy | pooled accuracy | job |
+|---|---|---|---|---|
+| `checkpoints_bellinzona` | 0.0918 | 0.819 | 0.824 (tp=106, tn=265, fp=68, fn=11) | 11498941 |
+| `checkpoints_trial_maskratio` | 0.0647 | 0.743 | 0.753 (tp=99, tn=240, fp=93, fn=18) | 11644022 |
+
+A lower masked-reconstruction loss just means mask-ratio 0.5 is an easier
+pretext task (fewer patches to reconstruct from), not that the encoder
+learned better features for the actual palm/non-palm discrimination task —
+worth remembering before picking a future SSL run's "winner" on val_loss
+alone. `checkpoints_trial_maskratio/` is kept on disk rather than deleted, in
+case it's useful for future comparison, but nothing in the active pipeline
+should point at it.
+
 ## Next steps
 
 1. Wire up the `TODO`s in `scripts/00`–`02` against the real endpoints.

@@ -217,6 +217,13 @@ def parse_probe_args() -> argparse.Namespace:
              "resource meant to teach the probe the confusable cases random sampling "
              "essentially never produces.",
     )
+    p.add_argument(
+        "--reviewed-positives", type=Path, default=None,
+        help="Optional path to active_learning_confirmed_palms.geojson (from "
+             "12_merge_review_verdicts.py) — locations confirmed as palms on manual "
+             "review. Added on top of --confirmed-points/--scouted-points as positives, "
+             "same reasoning as score_candidates.py's flag of the same name.",
+    )
     p.add_argument("--n-negatives", type=int, default=30)
     p.add_argument("--min-distance-m", type=float, default=20.0)
     p.add_argument("--crop-size", type=int, default=224)
@@ -292,6 +299,11 @@ def main() -> None:
         scouted = gpd.read_file(args.scouted_points)
         positive_geoms = pd.concat([positive_geoms, scouted.geometry], ignore_index=True)
         print(f"positives: {len(distinct)} confirmed + {len(scouted)} scouted = {len(positive_geoms)} total")
+
+    if args.reviewed_positives is not None:
+        reviewed_pos = gpd.read_file(args.reviewed_positives)
+        positive_geoms = pd.concat([positive_geoms, reviewed_pos.geometry], ignore_index=True)
+        print(f"positives: +{len(reviewed_pos)} active-learning-confirmed = {len(positive_geoms)} total")
 
     tile_paths = glob_tiles(args.tile_dirs, in_chans)
 
