@@ -8,8 +8,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
-#SBATCH --output=logs/palm-score-review-full-%j.out
-#SBATCH --error=logs/palm-score-review-full-%j.err
+#SBATCH --output=logs/score_review/palm-score-review-full-%j.out
+#SBATCH --error=logs/score_review/palm-score-review-full-%j.err
 
 # Full/near-full systematic grid scoring pass + one review page, meant to be
 # run rarely (once per meaningfully-updated checkpoint) rather than every
@@ -49,7 +49,7 @@
 #
 # Run from the repo root: sbatch --dependency=afterany:<prev_jobid> slurm/score_and_review_full.sbatch
 # (see chain submission notes in conversation — first submission needs no --dependency)
-mkdir -p logs candidate_review_full_dinov2
+mkdir -p logs/score_review candidate_review_full_dinov2
 
 CHECKPOINT="checkpoints_baseline_dinov2/checkpoint_best.pt"
 N_SAMPLES=2000000  # safely above the real grid size (~500k ballpark) so the full grid gets scored, not a subsample

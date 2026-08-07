@@ -8,8 +8,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=01:00:00
-#SBATCH --output=logs/palm-score-timing-trial-%j.out
-#SBATCH --error=logs/palm-score-timing-trial-%j.err
+#SBATCH --output=logs/score_review/palm-score-timing-trial-%j.out
+#SBATCH --error=logs/score_review/palm-score-timing-trial-%j.err
 
 # Purpose: get a real throughput number (ms/location) on the actual GPU, to
 # extrapolate how long a full/near-full grid scoring pass will take before
@@ -31,7 +31,7 @@
 # no need to wait for the reproducibility rerun to get a throughput estimate.
 #
 # Run from the repo root: sbatch slurm/score_timing_trial.sbatch
-mkdir -p logs
+mkdir -p logs/score_review
 
 TRIAL_N_SAMPLES=5000
 

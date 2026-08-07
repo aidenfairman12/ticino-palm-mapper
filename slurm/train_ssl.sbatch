@@ -8,13 +8,13 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=04:00:00
-#SBATCH --output=logs/palm-ssl-%j.out
-#SBATCH --error=logs/palm-ssl-%j.err
+#SBATCH --output=logs/ssl_pretrain/palm-ssl-%j.out
+#SBATCH --error=logs/ssl_pretrain/palm-ssl-%j.err
 
 # Run from the repo root: sbatch slurm/train_ssl.sbatch
 # Assumes ticino-palm.sif has already been built once via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs checkpoints
+mkdir -p logs/ssl_pretrain checkpoints
 
 # apptainer is on PATH system-wide on UBELIX (/usr/bin/apptainer) — no module needed.
 

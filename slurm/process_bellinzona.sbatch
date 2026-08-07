@@ -7,14 +7,14 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=16G
 #SBATCH --time=3-12:00:00
-#SBATCH --output=logs/bellinzona-pipeline-%j.out
-#SBATCH --error=logs/bellinzona-pipeline-%j.err
+#SBATCH --output=logs/data_pipeline/bellinzona-pipeline-%j.out
+#SBATCH --error=logs/data_pipeline/bellinzona-pipeline-%j.err
 
 # Run from the repo root: sbatch slurm/process_bellinzona.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
 set -e
-mkdir -p logs
+mkdir -p logs/data_pipeline
 
 CONFIG=configs/bellinzona_full_nir.yaml
 RUN() {

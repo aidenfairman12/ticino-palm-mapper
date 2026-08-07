@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=palm-probe-baseline-dinov2
+#SBATCH --job-name=palm-probe-mlp-h32
 #SBATCH --partition=gpu
 #SBATCH --account=gratis
 #SBATCH --qos=job_gratis
@@ -7,24 +7,27 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=02:00:00
-#SBATCH --output=logs/linear_probe/palm-probe-baseline-dinov2-%j.out
-#SBATCH --error=logs/linear_probe/palm-probe-baseline-dinov2-%j.err
+#SBATCH --time=24:00:00
+#SBATCH --output=logs/linear_probe/palm-probe-mlp-dino-%j.out
+#SBATCH --error=logs/linear_probe/palm-probe-mlp-dino-%j.err
 
-# Exports a plain-pretrained-DINOv2 checkpoint (no continued MAE pretraining
-# on domain imagery at all — see scripts/14_export_baseline_checkpoint.py's
-# docstring) and runs the same linear-probe eval against it, to check
-# whether the continued pretraining in checkpoints_bellinzona/ actually
-# helped linear-probe performance or hurt it (MAE reconstruction is
-# documented to sometimes produce less linearly-separable features than
-# DINOv2's original contrastive objective). Compare this job's accuracy
-# numbers against job 11498941 (checkpoints_bellinzona, pos_weight_multiplier
-# default) — see README.md's "SSL checkpoints" section for that baseline.
+# Tests a small one-hidden-layer MLP head (embed_dim -> 32 -> 1) instead of a
+# plain linear probe on the same checkpoints_bellinzona/checkpoint_best.pt
+# encoder — checks whether the frozen features need a mildly non-linear
+# boundary. See train_probe's docstring in src/training/linear_probe.py:
+# watch for CV numbers getting LESS stable (wider fold-to-fold swings) than
+# the linear probe (job 11701498, pos_weight_multiplier=1.0, mean per-fold
+# accuracy 0.723) — that's the overfitting signature, not evidence this
+# helped, given how tiny the labeled dataset still is.
 #
-# Run from the repo root: sbatch slurm/probe_baseline_dinov2.sbatch
+# 24h time budget given generously (a linear-probe run at this label-set
+# size took ~27 min) purely as a safety margin, not because this is
+# expected to actually need anywhere near that long.
+#
+# Run from the repo root: sbatch slurm/probe_mlp_hidden32.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/linear_probe checkpoints_baseline_dinov2
+mkdir -p logs/linear_probe
 
 start_time=$SECONDS
 
@@ -44,18 +47,6 @@ apptainer exec --nv --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/14_export_baseline_checkpoint.py \
-        --tile-dirs "${TILE_DIRS[@]}" \
-        --in-chans 6 \
-        --stats-from checkpoints_bellinzona/checkpoint_best.pt \
-        --output checkpoints_baseline_dinov2/checkpoint_best.pt
-
-apptainer exec --nv --cleanenv \
-    --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
-    --bind "$(pwd)":/workspace \
-    --bind /rs_scratch:/rs_scratch \
-    --pwd /workspace \
-    ticino-palm.sif \
     python -m src.training.linear_probe \
         --checkpoint checkpoints_baseline_dinov2/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
@@ -63,7 +54,8 @@ apptainer exec --nv --cleanenv \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
         --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
         --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
-        --pos-weight-multiplier "${POS_WEIGHT_MULT:-1.0}"
+        --pos-weight-multiplier 1.0 \
+        --hidden-dim 32
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

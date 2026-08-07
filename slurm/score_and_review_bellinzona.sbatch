@@ -8,13 +8,13 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=05:00:00
-#SBATCH --output=logs/palm-score-review-%j.out
-#SBATCH --error=logs/palm-score-review-%j.err
+#SBATCH --output=logs/score_review/palm-score-review-%j.out
+#SBATCH --error=logs/score_review/palm-score-review-%j.err
 
 # Run from the repo root: sbatch slurm/score_and_review_bellinzona.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs candidate_review
+mkdir -p logs/score_review candidate_review
 
 start_time=$SECONDS
 

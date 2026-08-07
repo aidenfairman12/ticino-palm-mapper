@@ -8,13 +8,13 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
-#SBATCH --output=logs/palm-ssl-bellinzona-%j.out
-#SBATCH --error=logs/palm-ssl-bellinzona-%j.err
+#SBATCH --output=logs/ssl_pretrain/palm-ssl-bellinzona-%j.out
+#SBATCH --error=logs/ssl_pretrain/palm-ssl-bellinzona-%j.err
 
 # Run from the repo root: sbatch slurm/train_ssl_bellinzona.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs checkpoints_bellinzona
+mkdir -p logs/ssl_pretrain checkpoints_bellinzona
 
 start_time=$SECONDS
 

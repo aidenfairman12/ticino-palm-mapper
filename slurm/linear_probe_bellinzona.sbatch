@@ -8,13 +8,13 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=02:00:00
-#SBATCH --output=logs/palm-probe-bellinzona-%j.out
-#SBATCH --error=logs/palm-probe-bellinzona-%j.err
+#SBATCH --output=logs/linear_probe/palm-probe-bellinzona-%j.out
+#SBATCH --error=logs/linear_probe/palm-probe-bellinzona-%j.err
 
 # Run from the repo root: sbatch slurm/linear_probe_bellinzona.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs
+mkdir -p logs/linear_probe
 
 start_time=$SECONDS
 

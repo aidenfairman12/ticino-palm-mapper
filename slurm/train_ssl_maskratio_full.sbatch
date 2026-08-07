@@ -8,8 +8,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
-#SBATCH --output=logs/palm-ssl-maskratio-full-%j.out
-#SBATCH --error=logs/palm-ssl-maskratio-full-%j.err
+#SBATCH --output=logs/ssl_pretrain/palm-ssl-maskratio-full-%j.out
+#SBATCH --error=logs/ssl_pretrain/palm-ssl-maskratio-full-%j.err
 
 # Full 150-epoch run for the winning trial config (mask-ratio 0.5, small
 # backbone default). Continues checkpoints_trial_maskratio/ from wherever
@@ -20,7 +20,7 @@
 # Run from the repo root: sbatch slurm/train_ssl_maskratio_full.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs checkpoints_trial_maskratio
+mkdir -p logs/ssl_pretrain checkpoints_trial_maskratio
 
 start_time=$SECONDS
 

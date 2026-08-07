@@ -8,8 +8,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=08:00:00
-#SBATCH --output=logs/palm-ssl-trial-vitbase-%j.out
-#SBATCH --error=logs/palm-ssl-trial-vitbase-%j.err
+#SBATCH --output=logs/ssl_pretrain/palm-ssl-trial-vitbase-%j.out
+#SBATCH --error=logs/ssl_pretrain/palm-ssl-trial-vitbase-%j.err
 
 # Trial run: larger (base) backbone vs. the real run's small backbone.
 # Fresh short run — deliberately NOT resumable, must not touch
@@ -19,7 +19,7 @@
 # Run from the repo root: sbatch slurm/train_ssl_trial_vitbase.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs checkpoints_trial_vitbase
+mkdir -p logs/ssl_pretrain checkpoints_trial_vitbase
 
 start_time=$SECONDS
 
