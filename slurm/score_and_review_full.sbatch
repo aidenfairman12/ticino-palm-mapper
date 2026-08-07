@@ -24,22 +24,36 @@
 # at most one flush interval of progress, not the whole run. That makes SLURM
 # job chaining actually safe/useful here; see the sbatch submission for it.
 #
-# CHECKPOINT is not gated on the pos_weight=1.0 reproducibility rerun anymore
-# (deprioritized — see conversation) — currently pointed at the small/0.75
-# real run's checkpoint_best.pt (val_loss=0.0918).
+# CHECKPOINT is checkpoints_baseline_dinov2/checkpoint_best.pt (plain
+# pretrained DINOv2, no continued MAE pretraining) — confirmed via a
+# controlled linear-probe comparison to massively outperform the domain-
+# adaptive checkpoints_bellinzona checkpoint (90.9% vs 72.8% pooled
+# accuracy, 84.2% vs 48.8% precision, same dataset/architecture/pos_weight).
+# See mae-continued-pretraining-hurts-linear-probe project memory. Also
+# confirmed an MLP head (--hidden-dim) doesn't help on this checkpoint —
+# its features are already separable enough that a linear head ties the
+# MLP's result, so production stays on the simpler plain linear probe.
+#
+# OUTPUT is a NEW path (not candidate_scores_full.geojson from the old
+# checkpoint's run) — score_candidates.py's resume-from-output logic tracks
+# "already scored" purely by (x, y) coordinates, with no awareness of which
+# checkpoint produced them. Reusing the old output path here would make
+# every location look already-scored and get silently skipped, leaving
+# stale old-checkpoint probabilities in a file that looks like a fresh
+# DINOv2-baseline run. The old file/review page are left alone in case
+# they're wanted for comparison.
 #
 # N_SAMPLES is set well above the real grid size (printed each run as "grid:
 # N candidate locations at ...m spacing") specifically so no subsampling
-# happens and the entire grid gets scored — exact grid size isn't known yet
-# (timing trial hasn't finished), so this errs high rather than guessing low
-# and silently leaving part of the AOI unscored.
+# happens and the entire grid gets scored.
 #
 # Run from the repo root: sbatch --dependency=afterany:<prev_jobid> slurm/score_and_review_full.sbatch
 # (see chain submission notes in conversation — first submission needs no --dependency)
-mkdir -p logs candidate_review_full
+mkdir -p logs candidate_review_full_dinov2
 
-CHECKPOINT="checkpoints_bellinzona/checkpoint_best.pt"
+CHECKPOINT="checkpoints_baseline_dinov2/checkpoint_best.pt"
 N_SAMPLES=2000000  # safely above the real grid size (~500k ballpark) so the full grid gets scored, not a subsample
+OUTPUT="candidate_scores_full_dinov2.geojson"
 
 start_time=$SECONDS
 
@@ -67,11 +81,11 @@ apptainer exec --nv --cleanenv \
         --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
         --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
         --n-samples "$N_SAMPLES" \
-        --output candidate_scores_full.geojson
+        --output "$OUTPUT"
 
 # First page of the ranked results — subsequent sessions reuse
-# candidate_scores_full.geojson directly with --offset (60, 120, ...)
-# instead of resubmitting this whole job.
+# $OUTPUT directly with --offset (60, 120, ...) instead of resubmitting
+# this whole job.
 apptainer exec --cleanenv \
     --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
     --bind "$(pwd)":/workspace \
@@ -79,10 +93,10 @@ apptainer exec --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python scripts/11_review_candidates.py \
-        --candidates candidate_scores_full.geojson \
+        --candidates "$OUTPUT" \
         --tile-dirs "${TILE_DIRS[@]}" \
         --offset 0 \
-        --output candidate_review_full/index.html
+        --output candidate_review_full_dinov2/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))
