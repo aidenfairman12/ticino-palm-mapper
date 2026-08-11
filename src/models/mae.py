@@ -37,22 +37,39 @@ import torch.nn as nn
 from timm.layers import resample_abs_pos_embed
 
 
+
+# Physical channel layout of this project's feature stacks, by in_chans —
+# NOT always "R,G,B first". [R,G,B,CHM] from 03_build_feature_stack.py, but
+# [NIR,R,G,B,NDVI,CHM] from 07_build_nir_stack.py (RS-native stacks lead
+# with NIR). adapt_patch_embed needs to know which slots are actually R,G,B
+# so it transfers pretrained weights onto the right physical channels.
+_RGB_CHANNEL_INDICES = {4: (0, 1, 2), 6: (1, 2, 3)}
+
+
 def adapt_patch_embed(backbone: nn.Module, in_chans: int) -> nn.Module:
     """Widen a pretrained ViT's patch-embedding conv from 3 to `in_chans`
     input channels, in place.
 
-    The pretrained RGB weights are copied into the first 3 input-channel
-    slots; the remaining channels (CHM, and NIR/NDVI if in_chans==6) are
-    zero-initialized. This means the model starts out numerically
-    identical to the pretrained RGB-only model — the new channels
+    The pretrained RGB weights are copied into whichever input-channel
+    slots actually hold R, G, B for this in_chans layout (see
+    _RGB_CHANNEL_INDICES) — not assumed to be the first 3 channels, since
+    the 6-channel NIR stack puts NIR first. Every other channel (CHM, NDVI,
+    and NIR/true-Blue where applicable) is zero-initialized: the model
+    starts out numerically identical to the pretrained RGB-only model on
+    the channels that actually are R, G, B, and the new channels
     contribute nothing until training gives them a reason to.
     """
+    if in_chans not in _RGB_CHANNEL_INDICES:
+        raise ValueError(f"no known R,G,B channel layout for in_chans={in_chans}")
+    rgb_channels = _RGB_CHANNEL_INDICES[in_chans]
+
     old_proj = backbone.patch_embed.proj
     new_proj = nn.Conv2d(in_chans, old_proj.out_channels, old_proj.kernel_size, old_proj.stride)
 
     with torch.no_grad():
-        new_proj.weight[:, :3, :, :] = old_proj.weight
-        new_proj.weight[:, 3:, :, :] = 0
+        new_proj.weight.zero_()
+        for new_c, old_c in zip(rgb_channels, range(3)):
+            new_proj.weight[:, new_c, :, :] = old_proj.weight[:, old_c, :, :]
         new_proj.bias = old_proj.bias
 
     backbone.patch_embed.proj = new_proj
