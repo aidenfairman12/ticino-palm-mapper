@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=palm-probe-baseline-dinov2
+#SBATCH --job-name=palm-probe-baseline-dinov2-fixed
 #SBATCH --partition=gpu
 #SBATCH --account=gratis
 #SBATCH --qos=job_gratis
@@ -8,23 +8,23 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
 #SBATCH --time=02:00:00
-#SBATCH --output=logs/linear_probe/palm-probe-baseline-dinov2-%j.out
-#SBATCH --error=logs/linear_probe/palm-probe-baseline-dinov2-%j.err
+#SBATCH --output=logs/linear_probe/palm-probe-baseline-dinov2-fixed-%j.out
+#SBATCH --error=logs/linear_probe/palm-probe-baseline-dinov2-fixed-%j.err
 
-# Exports a plain-pretrained-DINOv2 checkpoint (no continued MAE pretraining
-# on domain imagery at all — see scripts/14_export_baseline_checkpoint.py's
-# docstring) and runs the same linear-probe eval against it, to check
-# whether the continued pretraining in checkpoints/bellinzona/ actually
-# helped linear-probe performance or hurt it (MAE reconstruction is
-# documented to sometimes produce less linearly-separable features than
-# DINOv2's original contrastive objective). Compare this job's accuracy
-# numbers against job 11498941 (checkpoints/bellinzona, pos_weight_multiplier
-# default) — see README.md's "SSL checkpoints" section for that baseline.
+# Linear-probe eval of checkpoints/baseline_dinov2_fixed/checkpoint_best.pt
+# (plain pretrained DINOv2, R,G,B channels correctly mapped onto the
+# [NIR,R,G,B,NDVI,CHM] layout — see commit fcad6ce and
+# export_baseline_dinov2_fixed.sbatch) against the SAME label set as the
+# most recent broken-checkpoint run (job 11764565: 102 hard negatives, 45
+# reviewed positives) for a direct, apples-to-apples comparison of whether
+# the channel-alignment fix alone already improves things. Checkpoint
+# already exists (job 11989789) — no re-export needed here, unlike
+# probe_baseline_dinov2.sbatch.
 #
-# Run from the repo root: sbatch slurm/probe_baseline_dinov2.sbatch
+# Run from the repo root: sbatch slurm/probe_baseline_dinov2_fixed.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/linear_probe checkpoints/baseline_dinov2
+mkdir -p logs/linear_probe
 
 start_time=$SECONDS
 
@@ -44,20 +44,8 @@ apptainer exec --nv --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/14_export_baseline_checkpoint.py \
-        --tile-dirs "${TILE_DIRS[@]}" \
-        --in-chans 6 \
-        --stats-from checkpoints/bellinzona/checkpoint_best.pt \
-        --output checkpoints/baseline_dinov2/checkpoint_best.pt
-
-apptainer exec --nv --cleanenv \
-    --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
-    --bind "$(pwd)":/workspace \
-    --bind /rs_scratch:/rs_scratch \
-    --pwd /workspace \
-    ticino-palm.sif \
     python -m src.training.linear_probe \
-        --checkpoint checkpoints/baseline_dinov2/checkpoint_best.pt \
+        --checkpoint checkpoints/baseline_dinov2_fixed/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \

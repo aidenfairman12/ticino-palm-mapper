@@ -13,13 +13,13 @@
 
 # Trial run: larger (base) backbone vs. the real run's small backbone.
 # Fresh short run — deliberately NOT resumable, must not touch
-# checkpoints_bellinzona/. See train_ssl_bellinzona.sbatch for the real,
+# checkpoints/bellinzona/. See train_ssl_bellinzona.sbatch for the real,
 # chained, full-budget run.
 #
 # Run from the repo root: sbatch slurm/train_ssl_trial_vitbase.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/ssl_pretrain checkpoints_trial_vitbase
+mkdir -p logs/ssl_pretrain checkpoints/trial_vitbase
 
 start_time=$SECONDS
 
@@ -42,7 +42,7 @@ apptainer exec --nv --cleanenv \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821 \
         --in-chans 6 \
         --model-size base \
-        --checkpoint-dir checkpoints_trial_vitbase
+        --checkpoint-dir checkpoints/trial_vitbase
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

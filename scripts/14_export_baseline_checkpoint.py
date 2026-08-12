@@ -21,7 +21,7 @@ backbone started as DINOv2 and got continued-pretrained via MAE
 reconstruction, it's worth directly checking whether that continued
 pretraining helped or hurt linear-probe performance, rather than assuming
 domain-adaptive pretraining is strictly better. Run linear_probe.py
-against this checkpoint's output and compare to checkpoints_bellinzona/
+against this checkpoint's output and compare to checkpoints/bellinzona/
 checkpoint_best.pt's numbers — if this baseline does BETTER, that's a real
 finding worth taking seriously, not just a sanity check that failed to
 find anything.
@@ -61,7 +61,7 @@ def parse_export_args() -> argparse.Namespace:
     p.add_argument(
         "--stats-from", type=Path, default=None,
         help="Optional: reuse the stats already saved in an existing checkpoint (e.g. "
-             "checkpoints_bellinzona/checkpoint_best.pt) instead of recomputing via "
+             "checkpoints/bellinzona/checkpoint_best.pt) instead of recomputing via "
              "compute_channel_stats. Since the split params below match pretrain_ssl.py's "
              "exactly, the same --tile-dirs would produce byte-identical stats anyway — this "
              "just skips re-reading every train tile from disk to get there. Only valid if "
@@ -73,7 +73,7 @@ def parse_export_args() -> argparse.Namespace:
     p.add_argument("--test-frac", type=float, default=0.15)
     p.add_argument("--block-size-m", type=float, default=150)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--output", type=Path, default=Path("checkpoints_baseline_dinov2/checkpoint_best.pt"))
+    p.add_argument("--output", type=Path, default=Path("checkpoints/baseline_dinov2/checkpoint_best.pt"))
     return p.parse_args()
 
 

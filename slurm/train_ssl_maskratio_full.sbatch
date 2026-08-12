@@ -12,21 +12,21 @@
 #SBATCH --error=logs/ssl_pretrain/palm-ssl-maskratio-full-%j.err
 
 # Full 150-epoch run for the winning trial config (mask-ratio 0.5, small
-# backbone default). Continues checkpoints_trial_maskratio/ from wherever
+# backbone default). Continues checkpoints/trial_maskratio/ from wherever
 # the trial left off (does NOT start over) and is resumable/chainable, same
-# pattern as train_ssl_bellinzona.sbatch. checkpoints_bellinzona/ (the
+# pattern as train_ssl_bellinzona.sbatch. checkpoints/bellinzona/ (the
 # small/0.75 run) is left untouched for comparison.
 #
 # Run from the repo root: sbatch slurm/train_ssl_maskratio_full.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/ssl_pretrain checkpoints_trial_maskratio
+mkdir -p logs/ssl_pretrain checkpoints/trial_maskratio
 
 start_time=$SECONDS
 
 # Resume from whichever checkpoint is newest, so this script can be chained
 # without hardcoding an epoch number each time.
-LATEST_CKPT=$(ls -v checkpoints_trial_maskratio/checkpoint_epoch*.pt 2>/dev/null | tail -n 1)
+LATEST_CKPT=$(ls -v checkpoints/trial_maskratio/checkpoint_epoch*.pt 2>/dev/null | tail -n 1)
 RESUME_ARGS=()
 if [ -n "$LATEST_CKPT" ]; then
     RESUME_ARGS=(--resume-from "$LATEST_CKPT")
@@ -51,7 +51,7 @@ apptainer exec --nv --cleanenv \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821 \
         --in-chans 6 \
         --mask-ratio 0.5 \
-        --checkpoint-dir checkpoints_trial_maskratio \
+        --checkpoint-dir checkpoints/trial_maskratio \
         "${RESUME_ARGS[@]}"
 
 elapsed=$((SECONDS - start_time))

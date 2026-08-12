@@ -54,7 +54,7 @@ apptainer exec --nv --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python -m src.inference.score_candidates \
-        --checkpoint checkpoints_trial_maskratio/checkpoint_best.pt \
+        --checkpoint checkpoints/trial_maskratio/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \

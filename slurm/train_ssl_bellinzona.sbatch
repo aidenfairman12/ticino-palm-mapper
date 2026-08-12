@@ -14,13 +14,13 @@
 # Run from the repo root: sbatch slurm/train_ssl_bellinzona.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/ssl_pretrain checkpoints_bellinzona
+mkdir -p logs/ssl_pretrain checkpoints/bellinzona
 
 start_time=$SECONDS
 
 # Resume from whichever checkpoint is newest, so this script can be chained
 # (see submit_chain.sh) without hardcoding an epoch number each time.
-LATEST_CKPT=$(ls -v checkpoints_bellinzona/checkpoint_epoch*.pt 2>/dev/null | tail -n 1)
+LATEST_CKPT=$(ls -v checkpoints/bellinzona/checkpoint_epoch*.pt 2>/dev/null | tail -n 1)
 RESUME_ARGS=()
 if [ -n "$LATEST_CKPT" ]; then
     RESUME_ARGS=(--resume-from "$LATEST_CKPT")
@@ -44,7 +44,7 @@ apptainer exec --nv --cleanenv \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210811 \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821 \
         --in-chans 6 \
-        --checkpoint-dir checkpoints_bellinzona \
+        --checkpoint-dir checkpoints/bellinzona \
         "${RESUME_ARGS[@]}"
 
 elapsed=$((SECONDS - start_time))

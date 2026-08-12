@@ -12,7 +12,7 @@
 #SBATCH --error=logs/linear_probe/palm-probe-mlp-dino-%j.err
 
 # Tests a small one-hidden-layer MLP head (embed_dim -> 32 -> 1) instead of a
-# plain linear probe on the same checkpoints_bellinzona/checkpoint_best.pt
+# plain linear probe on the same checkpoints/bellinzona/checkpoint_best.pt
 # encoder — checks whether the frozen features need a mildly non-linear
 # boundary. See train_probe's docstring in src/training/linear_probe.py:
 # watch for CV numbers getting LESS stable (wider fold-to-fold swings) than
@@ -48,7 +48,7 @@ apptainer exec --nv --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python -m src.training.linear_probe \
-        --checkpoint checkpoints_baseline_dinov2/checkpoint_best.pt \
+        --checkpoint checkpoints/baseline_dinov2/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
