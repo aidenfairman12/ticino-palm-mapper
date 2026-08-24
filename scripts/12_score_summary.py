@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-13_score_summary.py
-====================
+12_score_summary.py
+===================
 Summary statistics for a score_candidates.py output file — how many
 locations were scored, the shape of the predicted_prob distribution, and
 how many fall in each confidence band. Meant as a quick sanity check after
@@ -10,7 +10,7 @@ diving into the per-card review.
 
 "Classified as palm" below means predicted_prob > 0.5 — the model's raw
 threshold output, not a confirmed palm. Confirming still requires manual
-review (11_review_candidates.py -> 12_merge_review_verdicts.py); this
+review (10_review_candidates.py -> 11_merge_review_verdicts.py); this
 script is purely descriptive of what the model produced.
 
 STATUS: implemented.

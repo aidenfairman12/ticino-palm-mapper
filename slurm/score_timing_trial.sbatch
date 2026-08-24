@@ -61,7 +61,7 @@ apptainer exec --nv --cleanenv \
         --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
         --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
         --n-samples "$TRIAL_N_SAMPLES" \
-        --output candidate_scores_timing_trial.geojson
+        --output candidate_scores/timing_trial.geojson
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

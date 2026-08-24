@@ -34,11 +34,15 @@ data/interim/labels/*
 *.pt
 *.ckpt
 
-# full-grid scoring output — regenerable (sbatch slurm/score_and_review_full.sbatch),
-# hundreds of thousands of rows, exceeds GitHub's 100MB file size limit.
-# Wildcarded since each checkpoint variant gets its own output file (e.g.
-# candidate_scores_full_dinov2.geojson) — same size problem, same fix.
-candidate_scores_full*.geojson
+# full-grid scoring output — regenerable (sbatch slurm/score_and_review_full.sbatch,
+# slurm/score_and_review_bellinzona_fixed.sbatch), hundreds of thousands of
+# rows, exceeds GitHub's 100MB file size limit. Only the small/subsampled
+# candidate_scores/*.geojson runs (--n-samples in the tens, not the full grid)
+# stay tracked, e.g. candidate_scores/bellinzona.geojson and
+# candidate_scores/maskratio.geojson.
+candidate_scores/full*.geojson
+candidate_scores/bellinzona_fixed.geojson
+candidate_scores/timing_trial.geojson
 
 # built containers / job logs
 *.sif

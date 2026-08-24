@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-12_merge_review_verdicts.py
-============================
-Merge a candidate_verdicts.csv (exported from 11_review_candidates.py's
+11_merge_review_verdicts.py
+===========================
+Merge a candidate_verdicts.csv (exported from 10_review_candidates.py's
 review page) into the labeled dataset.
 
   - verdict == "palm"      -> appended to --positives-output, using

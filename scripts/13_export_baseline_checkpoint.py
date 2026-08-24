@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-14_export_baseline_checkpoint.py
-==================================
+13_export_baseline_checkpoint.py
+================================
 Exports a checkpoint in the same format pretrain_ssl.py's save_checkpoint
 produces, but using the PLAIN pretrained DINOv2 backbone — no continued
 MAE pretraining on domain imagery at all. Not a trained checkpoint; the

@@ -39,7 +39,7 @@ apptainer exec --nv --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/14_export_baseline_checkpoint.py \
+    python scripts/13_export_baseline_checkpoint.py \
         --stats-from checkpoints/bellinzona/checkpoint_best.pt \
         --tile-dirs \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210324 \

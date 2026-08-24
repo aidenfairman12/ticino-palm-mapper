@@ -338,7 +338,7 @@ def parse_score_args() -> argparse.Namespace:
     p.add_argument(
         "--hard-negatives", type=Path, default=None,
         help="Optional path to active_learning_hard_negatives.geojson (from "
-             "12_merge_review_verdicts.py) — added ON TOP of the --n-negatives random "
+             "11_merge_review_verdicts.py) — added ON TOP of the --n-negatives random "
              "negatives when training the production probe (same reasoning as "
              "linear_probe.py's --hard-negatives), AND excluded from the random "
              "locations sampled for scoring, so a repeat run doesn't re-surface "
@@ -347,7 +347,7 @@ def parse_score_args() -> argparse.Namespace:
     p.add_argument(
         "--reviewed-positives", type=Path, default=None,
         help="Optional path to active_learning_confirmed_palms.geojson (from "
-             "12_merge_review_verdicts.py) — excluded from the random locations "
+             "11_merge_review_verdicts.py) — excluded from the random locations "
              "sampled for scoring, so a repeat run doesn't re-surface spots "
              "already confirmed as palms for review.",
     )
@@ -383,7 +383,7 @@ def parse_score_args() -> argparse.Namespace:
              "instead — see linear_probe.py's flag of the same name for the reasoning.",
     )
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--output", type=Path, default=Path("candidate_scores.geojson"))
+    p.add_argument("--output", type=Path, default=Path("candidate_scores/scores.geojson"))
     return p.parse_args()
 
 

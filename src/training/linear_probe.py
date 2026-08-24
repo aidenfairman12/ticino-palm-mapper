@@ -233,7 +233,7 @@ def parse_probe_args() -> argparse.Namespace:
     p.add_argument(
         "--hard-negatives", type=Path, default=None,
         help="Optional path to active_learning_hard_negatives.geojson (from "
-             "12_merge_review_verdicts.py) — locations that scored high but were "
+             "11_merge_review_verdicts.py) — locations that scored high but were "
              "confirmed not-palm on manual review. Added ON TOP of the --n-negatives "
              "random negatives (not a replacement), since they're a targeted, scarce "
              "resource meant to teach the probe the confusable cases random sampling "
@@ -242,7 +242,7 @@ def parse_probe_args() -> argparse.Namespace:
     p.add_argument(
         "--reviewed-positives", type=Path, default=None,
         help="Optional path to active_learning_confirmed_palms.geojson (from "
-             "12_merge_review_verdicts.py) — locations confirmed as palms on manual "
+             "11_merge_review_verdicts.py) — locations confirmed as palms on manual "
              "review. Added on top of --confirmed-points/--scouted-points as positives, "
              "same reasoning as score_candidates.py's flag of the same name.",
     )

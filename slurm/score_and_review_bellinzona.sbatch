@@ -14,7 +14,7 @@
 # Run from the repo root: sbatch slurm/score_and_review_bellinzona.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/score_review candidate_review
+mkdir -p logs/score_review review/bellinzona
 
 start_time=$SECONDS
 
@@ -42,7 +42,7 @@ apptainer exec --nv --cleanenv \
         --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
         --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
         --n-samples 50 \
-        --output candidate_scores.geojson
+        --output candidate_scores/bellinzona.geojson
 
 apptainer exec --cleanenv \
     --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
@@ -50,10 +50,10 @@ apptainer exec --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/11_review_candidates.py \
-        --candidates candidate_scores.geojson \
+    python scripts/10_review_candidates.py \
+        --candidates candidate_scores/bellinzona.geojson \
         --tile-dirs "${TILE_DIRS[@]}" \
-        --output candidate_review/index.html
+        --output review/bellinzona/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

@@ -13,7 +13,7 @@
 
 # Full/near-full systematic grid scoring pass + one review page, meant to be
 # run rarely (once per meaningfully-updated checkpoint) rather than every
-# review session — see 11_review_candidates.py's --offset flag for reviewing
+# review session — see 10_review_candidates.py's --offset flag for reviewing
 # this same output incrementally across many sessions without re-scoring.
 #
 # score_candidates.py now resumes from --output if it already exists (skips
@@ -34,7 +34,7 @@
 # its features are already separable enough that a linear head ties the
 # MLP's result, so production stays on the simpler plain linear probe.
 #
-# OUTPUT is a NEW path (not candidate_scores_full.geojson from the old
+# OUTPUT is a NEW path (not candidate_scores/full.geojson from the old
 # checkpoint's run) — score_candidates.py's resume-from-output logic tracks
 # "already scored" purely by (x, y) coordinates, with no awareness of which
 # checkpoint produced them. Reusing the old output path here would make
@@ -49,11 +49,11 @@
 #
 # Run from the repo root: sbatch --dependency=afterany:<prev_jobid> slurm/score_and_review_full.sbatch
 # (see chain submission notes in conversation — first submission needs no --dependency)
-mkdir -p logs/score_review candidate_review_full_dinov2
+mkdir -p logs/score_review review/full_dinov2
 
 CHECKPOINT="checkpoints/baseline_dinov2/checkpoint_best.pt"
 N_SAMPLES=2000000  # safely above the real grid size (~500k ballpark) so the full grid gets scored, not a subsample
-OUTPUT="candidate_scores_full_dinov2.geojson"
+OUTPUT="candidate_scores/full_dinov2.geojson"
 
 start_time=$SECONDS
 
@@ -92,11 +92,11 @@ apptainer exec --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/11_review_candidates.py \
+    python scripts/10_review_candidates.py \
         --candidates "$OUTPUT" \
         --tile-dirs "${TILE_DIRS[@]}" \
         --offset 0 \
-        --output candidate_review_full_dinov2/index.html
+        --output review/full_dinov2/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

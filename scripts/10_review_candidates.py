@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-11_review_candidates.py
-========================
+10_review_candidates.py
+=======================
 Build an HTML review sheet for score_candidates.py's output — same
 Street View / satellite / swisstopo cross-referencing workflow as
 05_labeling_assist.py, but sourced from model-scored random locations
@@ -274,7 +274,7 @@ def parse_review_args() -> argparse.Namespace:
     )
     p.add_argument("--crop-size", type=int, default=224, help="Should match --crop-size used when scoring.")
     p.add_argument("--img-px", type=int, default=200, help="Display size (pixels) for each card's image.")
-    p.add_argument("--output", type=Path, default=Path("candidate_review/index.html"))
+    p.add_argument("--output", type=Path, default=Path("review/bellinzona/index.html"))
     return p.parse_args()
 
 

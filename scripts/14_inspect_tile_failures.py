@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-15_inspect_tile_failures.py
-=============================
+14_inspect_tile_failures.py
+===========================
 Visual inspection tool for specific tiles where leave-one-tile-out CV
 showed poor recall on their confirmed positives — renders every known
 positive location within the given tiles as a read-only card (RGB crop +
@@ -62,7 +62,7 @@ def _png_b64(arr_hwc: np.ndarray) -> str:
 def _load_crop_and_rgb(tile_path: Path, point: Point, crop_size: int) -> tuple[np.ndarray, np.ndarray]:
     """Load `tile_path` once, return (raw_crop, display_rgb) — raw_crop for
     normalize()+scoring, display_rgb via the same percentile contrast-stretch
-    approach as 11_review_candidates.py (this RS-delivery imagery isn't
+    approach as 10_review_candidates.py (this RS-delivery imagery isn't
     standard 0-255, a naive clip blows every pixel to white)."""
     arr, transform, _ = load_tile(tile_path)
     raw_crop = crop_centered_on_point(arr, transform, point, crop_size)
@@ -134,7 +134,7 @@ def parse_inspect_args() -> argparse.Namespace:
     p.add_argument("--pos-weight-multiplier", type=float, default=1.0)
     p.add_argument("--hidden-dim", type=int, default=0)
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--output", type=Path, default=Path("tile_failure_inspection/index.html"))
+    p.add_argument("--output", type=Path, default=Path("review/tile_failure_inspection/index.html"))
     return p.parse_args()
 
 

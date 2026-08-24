@@ -12,7 +12,7 @@
 #SBATCH --error=logs/linear_probe/palm-probe-baseline-dinov2-%j.err
 
 # Exports a plain-pretrained-DINOv2 checkpoint (no continued MAE pretraining
-# on domain imagery at all — see scripts/14_export_baseline_checkpoint.py's
+# on domain imagery at all — see scripts/13_export_baseline_checkpoint.py's
 # docstring) and runs the same linear-probe eval against it, to check
 # whether the continued pretraining in checkpoints/bellinzona/ actually
 # helped linear-probe performance or hurt it (MAE reconstruction is
@@ -44,7 +44,7 @@ apptainer exec --nv --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/14_export_baseline_checkpoint.py \
+    python scripts/13_export_baseline_checkpoint.py \
         --tile-dirs "${TILE_DIRS[@]}" \
         --in-chans 6 \
         --stats-from checkpoints/bellinzona/checkpoint_best.pt \

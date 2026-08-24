@@ -21,7 +21,7 @@
 # Picked by RAW false-negative count (not just worst recall), so this is
 # robust, multi-example failure signal rather than a single unlucky point —
 # tiles with only 1-2 confirmed positives and 0% recall were left out for
-# that reason. See scripts/15_inspect_tile_failures.py's docstring: this
+# that reason. See scripts/14_inspect_tile_failures.py's docstring: this
 # probe is trained on ALL current labels (including these tiles' own
 # positives), not the actual held-out CV fold, so a low predicted_prob here
 # is a STRONGER signal than the CV fold's own miss, not a weaker one.
@@ -63,7 +63,7 @@ apptainer exec --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/15_inspect_tile_failures.py \
+    python scripts/14_inspect_tile_failures.py \
         --checkpoint checkpoints/baseline_dinov2/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
@@ -72,7 +72,7 @@ apptainer exec --cleanenv \
         --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
         --pos-weight-multiplier 1.0 \
         --tiles "${FAILING_TILES[@]}" \
-        --output tile_failure_inspection/index.html
+        --output review/tile_failure_inspection/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

@@ -40,11 +40,11 @@
 # entire grid gets scored.
 #
 # Run from the repo root: sbatch slurm/score_and_review_bellinzona_fixed.sbatch
-mkdir -p logs/score_review candidate_review_bellinzona_fixed
+mkdir -p logs/score_review review/bellinzona_fixed
 
 CHECKPOINT="checkpoints/bellinzona_fixed/checkpoint_best.pt"
 N_SAMPLES=2000000  # safely above the real grid size (~500k ballpark) so the full grid gets scored, not a subsample
-OUTPUT="candidate_scores_bellinzona_fixed.geojson"
+OUTPUT="candidate_scores/bellinzona_fixed.geojson"
 
 start_time=$SECONDS
 
@@ -83,12 +83,12 @@ apptainer exec --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/11_review_candidates.py \
+    python scripts/10_review_candidates.py \
         --candidates "$OUTPUT" \
         --tile-dirs "${TILE_DIRS[@]}" \
         --offset 0 \
         --max-cards 100 \
-        --output candidate_review_bellinzona_fixed/index.html
+        --output review/bellinzona_fixed/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

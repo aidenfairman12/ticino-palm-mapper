@@ -19,7 +19,7 @@
 # Run from the repo root: sbatch slurm/score_and_review_maskratio.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/score_review candidate_review_maskratio
+mkdir -p logs/score_review review/maskratio
 
 start_time=$SECONDS
 
@@ -48,7 +48,7 @@ apptainer exec --nv --cleanenv \
         --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
         --n-samples 50 \
         --seed 123 \
-        --output candidate_scores_maskratio.geojson
+        --output candidate_scores/maskratio.geojson
 
 apptainer exec --cleanenv \
     --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
@@ -56,10 +56,10 @@ apptainer exec --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python scripts/11_review_candidates.py \
-        --candidates candidate_scores_maskratio.geojson \
+    python scripts/10_review_candidates.py \
+        --candidates candidate_scores/maskratio.geojson \
         --tile-dirs "${TILE_DIRS[@]}" \
-        --output candidate_review_maskratio/index.html
+        --output review/maskratio/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))
