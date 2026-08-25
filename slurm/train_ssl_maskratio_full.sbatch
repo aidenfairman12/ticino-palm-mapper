@@ -14,7 +14,7 @@
 # Full 150-epoch run for the winning trial config (mask-ratio 0.5, small
 # backbone default). Continues checkpoints/trial_maskratio/ from wherever
 # the trial left off (does NOT start over) and is resumable/chainable, same
-# pattern as train_ssl_bellinzona.sbatch. checkpoints/bellinzona/ (the
+# pattern as train_ssl_bellinzona.sbatch. checkpoints/dinov2_mae/ (the
 # small/0.75 run) is left untouched for comparison.
 #
 # Run from the repo root: sbatch slurm/train_ssl_maskratio_full.sbatch

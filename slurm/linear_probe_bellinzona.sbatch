@@ -29,7 +29,7 @@ apptainer exec --nv --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python -m src.training.linear_probe \
-        --checkpoint checkpoints/bellinzona/checkpoint_best.pt \
+        --checkpoint checkpoints/dinov2_mae/checkpoint_best.pt \
         --tile-dirs \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210324 \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210811 \

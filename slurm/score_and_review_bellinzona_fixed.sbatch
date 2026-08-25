@@ -12,13 +12,13 @@
 #SBATCH --error=logs/score_review/palm-score-review-bellinzona-fixed-%j.err
 
 # Full/near-full systematic grid scoring pass + one review page, using
-# checkpoints/bellinzona_fixed/checkpoint_best.pt (continued-MAE-pretrained,
+# checkpoints/dinov2_mae_fixed/checkpoint_best.pt (continued-MAE-pretrained,
 # channel-alignment fix applied — see commit fcad6ce and
 # adapt_patch_embed-channel-misalignment-bug project memory).
 #
-# Chosen over baseline_dinov2_fixed for this batch specifically: linear-probe
-# CV on the *_fixed checkpoints shows baseline_dinov2_fixed wins pooled
-# accuracy (81.6% vs 72.4%), but bellinzona_fixed wins recall on the hard
+# Chosen over dinov2_vanilla_fixed for this batch specifically: linear-probe
+# CV on the *_fixed checkpoints shows dinov2_vanilla_fixed wins pooled
+# accuracy (81.6% vs 72.4%), but dinov2_mae_fixed wins recall on the hard
 # residential/garden folds (84% vs 66%) that originally motivated the
 # channel-alignment fix — i.e. it catches more true palms in exactly the
 # settings the fix was meant to help, at the cost of more false positives to
@@ -40,11 +40,11 @@
 # entire grid gets scored.
 #
 # Run from the repo root: sbatch slurm/score_and_review_bellinzona_fixed.sbatch
-mkdir -p logs/score_review review/bellinzona_fixed
+mkdir -p logs/score_review review/full_dinov2_mae_fixed
 
-CHECKPOINT="checkpoints/bellinzona_fixed/checkpoint_best.pt"
+CHECKPOINT="checkpoints/dinov2_mae_fixed/checkpoint_best.pt"
 N_SAMPLES=2000000  # safely above the real grid size (~500k ballpark) so the full grid gets scored, not a subsample
-OUTPUT="candidate_scores/bellinzona_fixed.geojson"
+OUTPUT="candidate_scores/full_dinov2_mae_fixed.geojson"
 
 start_time=$SECONDS
 
@@ -88,7 +88,7 @@ apptainer exec --cleanenv \
         --tile-dirs "${TILE_DIRS[@]}" \
         --offset 0 \
         --max-cards 100 \
-        --output review/bellinzona_fixed/index.html
+        --output review/full_dinov2_mae_fixed/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

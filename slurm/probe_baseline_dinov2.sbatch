@@ -14,17 +14,17 @@
 # Exports a plain-pretrained-DINOv2 checkpoint (no continued MAE pretraining
 # on domain imagery at all — see scripts/13_export_baseline_checkpoint.py's
 # docstring) and runs the same linear-probe eval against it, to check
-# whether the continued pretraining in checkpoints/bellinzona/ actually
+# whether the continued pretraining in checkpoints/dinov2_mae/ actually
 # helped linear-probe performance or hurt it (MAE reconstruction is
 # documented to sometimes produce less linearly-separable features than
 # DINOv2's original contrastive objective). Compare this job's accuracy
-# numbers against job 11498941 (checkpoints/bellinzona, pos_weight_multiplier
+# numbers against job 11498941 (checkpoints/dinov2_mae, pos_weight_multiplier
 # default) — see README.md's "SSL checkpoints" section for that baseline.
 #
 # Run from the repo root: sbatch slurm/probe_baseline_dinov2.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/linear_probe checkpoints/baseline_dinov2
+mkdir -p logs/linear_probe checkpoints/dinov2_vanilla
 
 start_time=$SECONDS
 
@@ -47,8 +47,8 @@ apptainer exec --nv --cleanenv \
     python scripts/13_export_baseline_checkpoint.py \
         --tile-dirs "${TILE_DIRS[@]}" \
         --in-chans 6 \
-        --stats-from checkpoints/bellinzona/checkpoint_best.pt \
-        --output checkpoints/baseline_dinov2/checkpoint_best.pt
+        --stats-from checkpoints/dinov2_mae/checkpoint_best.pt \
+        --output checkpoints/dinov2_vanilla/checkpoint_best.pt
 
 apptainer exec --nv --cleanenv \
     --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
@@ -57,7 +57,7 @@ apptainer exec --nv --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python -m src.training.linear_probe \
-        --checkpoint checkpoints/baseline_dinov2/checkpoint_best.pt \
+        --checkpoint checkpoints/dinov2_vanilla/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \

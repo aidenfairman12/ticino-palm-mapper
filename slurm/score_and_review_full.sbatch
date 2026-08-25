@@ -24,10 +24,10 @@
 # at most one flush interval of progress, not the whole run. That makes SLURM
 # job chaining actually safe/useful here; see the sbatch submission for it.
 #
-# CHECKPOINT is checkpoints/baseline_dinov2/checkpoint_best.pt (plain
+# CHECKPOINT is checkpoints/dinov2_vanilla/checkpoint_best.pt (plain
 # pretrained DINOv2, no continued MAE pretraining) — confirmed via a
 # controlled linear-probe comparison to massively outperform the domain-
-# adaptive checkpoints/bellinzona checkpoint (90.9% vs 72.8% pooled
+# adaptive checkpoints/dinov2_mae checkpoint (90.9% vs 72.8% pooled
 # accuracy, 84.2% vs 48.8% precision, same dataset/architecture/pos_weight).
 # See mae-continued-pretraining-hurts-linear-probe project memory. Also
 # confirmed an MLP head (--hidden-dim) doesn't help on this checkpoint —
@@ -49,11 +49,11 @@
 #
 # Run from the repo root: sbatch --dependency=afterany:<prev_jobid> slurm/score_and_review_full.sbatch
 # (see chain submission notes in conversation — first submission needs no --dependency)
-mkdir -p logs/score_review review/full_dinov2
+mkdir -p logs/score_review review/full_dinov2_vanilla
 
-CHECKPOINT="checkpoints/baseline_dinov2/checkpoint_best.pt"
+CHECKPOINT="checkpoints/dinov2_vanilla/checkpoint_best.pt"
 N_SAMPLES=2000000  # safely above the real grid size (~500k ballpark) so the full grid gets scored, not a subsample
-OUTPUT="candidate_scores/full_dinov2.geojson"
+OUTPUT="candidate_scores/full_dinov2_vanilla.geojson"
 
 start_time=$SECONDS
 
@@ -96,7 +96,7 @@ apptainer exec --cleanenv \
         --candidates "$OUTPUT" \
         --tile-dirs "${TILE_DIRS[@]}" \
         --offset 0 \
-        --output review/full_dinov2/index.html
+        --output review/full_dinov2_vanilla/index.html
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

@@ -11,7 +11,7 @@
 #SBATCH --error=logs/linear_probe/palm-inspect-tile-failures-%j.err
 
 # Visual inspection of the 5 tiles with the most robust leave-one-tile-out CV
-# recall failures on confirmed positives, from job 11764565 (checkpoints/baseline_dinov2,
+# recall failures on confirmed positives, from job 11764565 (checkpoints/dinov2_vanilla,
 # 102 hard negatives / 45 reviewed positives, pos_weight_multiplier=1.0):
 #   c052_r050: 7 false negatives (7 of 14 confirmed positives missed, 50% recall)
 #   c053_r049: 5 false negatives (5 of 14 missed, 64% recall)
@@ -64,7 +64,7 @@ apptainer exec --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python scripts/14_inspect_tile_failures.py \
-        --checkpoint checkpoints/baseline_dinov2/checkpoint_best.pt \
+        --checkpoint checkpoints/dinov2_vanilla/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \

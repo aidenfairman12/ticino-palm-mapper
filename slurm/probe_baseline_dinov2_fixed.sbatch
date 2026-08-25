@@ -11,7 +11,7 @@
 #SBATCH --output=logs/linear_probe/palm-probe-baseline-dinov2-fixed-%j.out
 #SBATCH --error=logs/linear_probe/palm-probe-baseline-dinov2-fixed-%j.err
 
-# Linear-probe eval of checkpoints/baseline_dinov2_fixed/checkpoint_best.pt
+# Linear-probe eval of checkpoints/dinov2_vanilla_fixed/checkpoint_best.pt
 # (plain pretrained DINOv2, R,G,B channels correctly mapped onto the
 # [NIR,R,G,B,NDVI,CHM] layout — see commit fcad6ce and
 # export_baseline_dinov2_fixed.sbatch) against the SAME label set as the
@@ -45,7 +45,7 @@ apptainer exec --nv --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python -m src.training.linear_probe \
-        --checkpoint checkpoints/baseline_dinov2_fixed/checkpoint_best.pt \
+        --checkpoint checkpoints/dinov2_vanilla_fixed/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \

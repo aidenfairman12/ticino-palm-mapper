@@ -13,21 +13,21 @@
 
 # Re-run of train_ssl_bellinzona.sbatch from a fresh init, after fixing the
 # R,G,B channel-alignment bug in adapt_patch_embed (src/models/mae.py) — the
-# original checkpoints/bellinzona run started from a misaligned init (NIR/R/G
+# original checkpoints/dinov2_mae run started from a misaligned init (NIR/R/G
 # routed through pretrained R/G/B weights, true Blue/NDVI/CHM zeroed). This
 # run isolates that fix as the only changed variable: same tile-dirs, same
 # in-chans, same mask-ratio/model-size/batch-size/total-epochs/patience
 # (all left at pretrain_ssl.py's defaults, unchanged from the original run).
 #
-# Writes to checkpoints/bellinzona_fixed/, NOT checkpoints/bellinzona/ — the
+# Writes to checkpoints/dinov2_mae_fixed/, NOT checkpoints/dinov2_mae/ — the
 # resume-glob below is scoped to the new dir specifically so this can safely
 # chain across multiple 24h submissions WITHOUT ever resuming from the old,
 # misaligned checkpoint.
-mkdir -p logs/ssl_pretrain checkpoints/bellinzona_fixed
+mkdir -p logs/ssl_pretrain checkpoints/dinov2_mae_fixed
 
 start_time=$SECONDS
 
-LATEST_CKPT=$(ls -v checkpoints/bellinzona_fixed/checkpoint_epoch*.pt 2>/dev/null | tail -n 1)
+LATEST_CKPT=$(ls -v checkpoints/dinov2_mae_fixed/checkpoint_epoch*.pt 2>/dev/null | tail -n 1)
 RESUME_ARGS=()
 if [ -n "$LATEST_CKPT" ]; then
     RESUME_ARGS=(--resume-from "$LATEST_CKPT")
@@ -45,7 +45,7 @@ apptainer exec --nv --cleanenv \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210811 \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821 \
         --in-chans 6 \
-        --checkpoint-dir checkpoints/bellinzona_fixed \
+        --checkpoint-dir checkpoints/dinov2_mae_fixed \
         "${RESUME_ARGS[@]}"
 
 elapsed=$((SECONDS - start_time))

@@ -274,7 +274,7 @@ def parse_review_args() -> argparse.Namespace:
     )
     p.add_argument("--crop-size", type=int, default=224, help="Should match --crop-size used when scoring.")
     p.add_argument("--img-px", type=int, default=200, help="Display size (pixels) for each card's image.")
-    p.add_argument("--output", type=Path, default=Path("review/bellinzona/index.html"))
+    p.add_argument("--output", type=Path, default=Path("review/dinov2_mae/index.html"))
     return p.parse_args()
 
 

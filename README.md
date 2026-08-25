@@ -122,7 +122,7 @@ terms for the occurrence data before any redistribution.
 
 ## SSL checkpoints
 
-`checkpoints/bellinzona/checkpoint_best.pt` (small backbone, mask-ratio 0.75, epoch
+`checkpoints/dinov2_mae/checkpoint_best.pt` (small backbone, mask-ratio 0.75, epoch
 148, SSL val_loss 0.0918) is the checkpoint currently in use for the linear
 probe / active-learning scoring pipeline — **not**
 `checkpoints/trial_maskratio/checkpoint_best.pt` (small backbone, mask-ratio
@@ -135,7 +135,7 @@ leave-one-tile-out CV (default `--pos-weight-multiplier`):
 
 | checkpoint | SSL val_loss | mean per-fold accuracy | pooled accuracy | job |
 |---|---|---|---|---|
-| `checkpoints/bellinzona` | 0.0918 | 0.819 | 0.824 (tp=106, tn=265, fp=68, fn=11) | 11498941 |
+| `checkpoints/dinov2_mae` | 0.0918 | 0.819 | 0.824 (tp=106, tn=265, fp=68, fn=11) | 11498941 |
 | `checkpoints/trial_maskratio` | 0.0647 | 0.743 | 0.753 (tp=99, tn=240, fp=93, fn=18) | 11644022 |
 
 A lower masked-reconstruction loss just means mask-ratio 0.5 is an easier

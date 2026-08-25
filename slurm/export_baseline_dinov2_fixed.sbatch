@@ -13,19 +13,19 @@
 
 # Regenerates the plain-pretrained-DINOv2 baseline checkpoint after fixing
 # the R,G,B channel-misalignment bug in adapt_patch_embed (src/models/mae.py,
-# commit fcad6ce) — the previous checkpoints/baseline_dinov2/checkpoint_best.pt
+# commit fcad6ce) — the previous checkpoints/dinov2_vanilla/checkpoint_best.pt
 # had pretrained R/G/B weights routed onto real NIR/R/G data, with true
 # Blue/NDVI/CHM zero-initialized. No training happens here (--stats-from
-# reuses checkpoints/bellinzona's existing, still-valid normalization stats,
+# reuses checkpoints/dinov2_mae's existing, still-valid normalization stats,
 # which are data- not weight-dependent) — this only needs a GPU node briefly
 # for the timm model load, not a training-length allocation.
 #
-# Writes to checkpoints/baseline_dinov2_fixed/, NOT checkpoints/baseline_dinov2/,
+# Writes to checkpoints/dinov2_vanilla_fixed/, NOT checkpoints/dinov2_vanilla/,
 # so the old (buggy) checkpoint stays available for comparison rather than
 # being silently overwritten.
 #
 # Run from the repo root: sbatch slurm/export_baseline_dinov2_fixed.sbatch
-mkdir -p logs/linear_probe checkpoints/baseline_dinov2_fixed
+mkdir -p logs/linear_probe checkpoints/dinov2_vanilla_fixed
 
 start_time=$SECONDS
 
@@ -40,12 +40,12 @@ apptainer exec --nv --cleanenv \
     --pwd /workspace \
     ticino-palm.sif \
     python scripts/13_export_baseline_checkpoint.py \
-        --stats-from checkpoints/bellinzona/checkpoint_best.pt \
+        --stats-from checkpoints/dinov2_mae/checkpoint_best.pt \
         --tile-dirs \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210324 \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210811 \
             /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821 \
-        --output checkpoints/baseline_dinov2_fixed/checkpoint_best.pt
+        --output checkpoints/dinov2_vanilla_fixed/checkpoint_best.pt
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

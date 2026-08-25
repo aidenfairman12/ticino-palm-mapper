@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=palm-score-review
+#SBATCH --job-name=palm-probe-bellinzona-fixed
 #SBATCH --partition=gpu
 #SBATCH --account=gratis
 #SBATCH --qos=job_gratis
@@ -7,14 +7,26 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=05:00:00
-#SBATCH --output=logs/score_review/palm-score-review-%j.out
-#SBATCH --error=logs/score_review/palm-score-review-%j.err
+#SBATCH --time=02:00:00
+#SBATCH --output=logs/linear_probe/palm-probe-bellinzona-fixed-%j.out
+#SBATCH --error=logs/linear_probe/palm-probe-bellinzona-fixed-%j.err
 
-# Run from the repo root: sbatch slurm/score_and_review_bellinzona.sbatch
+# Linear-probe eval of checkpoints/dinov2_mae_fixed/checkpoint_best.pt — the
+# continued-MAE-pretraining run redone from a fresh init after fixing the
+# R,G,B channel-alignment bug (commit fcad6ce), best checkpoint at epoch 140,
+# SSL val_loss 0.0930 (see train_ssl_bellinzona_fixed.sbatch). Compare
+# against this same run's sibling, probe_baseline_dinov2_fixed.sbatch (plain
+# DINOv2, same channel fix, no continued pretraining) to redo the
+# mae-continued-pretraining-hurts-linear-probe comparison now that both
+# checkpoints start from a correctly-aligned init — the original version of
+# that comparison (README's "SSL checkpoints" section) used the OLD,
+# misaligned checkpoints/dinov2_mae, so it's no longer a clean read on
+# whether continued pretraining itself helps or hurts.
+#
+# Run from the repo root: sbatch slurm/probe_bellinzona_fixed.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def
-mkdir -p logs/score_review review/dinov2_mae
+mkdir -p logs/linear_probe
 
 start_time=$SECONDS
 
@@ -34,26 +46,14 @@ apptainer exec --nv --cleanenv \
     --bind /rs_scratch:/rs_scratch \
     --pwd /workspace \
     ticino-palm.sif \
-    python -m src.inference.score_candidates \
-        --checkpoint checkpoints/dinov2_mae/checkpoint_best.pt \
+    python -m src.training.linear_probe \
+        --checkpoint checkpoints/dinov2_mae_fixed/checkpoint_best.pt \
         --tile-dirs "${TILE_DIRS[@]}" \
         --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
         --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
-        --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
         --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
-        --n-samples 50 \
-        --output candidate_scores/dinov2_mae.geojson
-
-apptainer exec --cleanenv \
-    --env LD_PRELOAD="/opt/conda/envs/ticino-palm/lib/libjpeg.so.8" \
-    --bind "$(pwd)":/workspace \
-    --bind /rs_scratch:/rs_scratch \
-    --pwd /workspace \
-    ticino-palm.sif \
-    python scripts/10_review_candidates.py \
-        --candidates candidate_scores/dinov2_mae.geojson \
-        --tile-dirs "${TILE_DIRS[@]}" \
-        --output review/dinov2_mae/index.html
+        --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
+        --pos-weight-multiplier "${POS_WEIGHT_MULT:-1.0}"
 
 elapsed=$((SECONDS - start_time))
 printf 'total job time: %02d:%02d:%02d\n' $((elapsed/3600)) $((elapsed%3600/60)) $((elapsed%60))

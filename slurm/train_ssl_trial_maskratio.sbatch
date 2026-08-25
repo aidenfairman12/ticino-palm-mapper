@@ -13,7 +13,7 @@
 
 # Trial run: lower mask ratio (0.5) vs. the real run's 0.75, small backbone
 # kept at default. Fresh short run — deliberately NOT resumable, must not
-# touch checkpoints/bellinzona/. See train_ssl_bellinzona.sbatch for the
+# touch checkpoints/dinov2_mae/. See train_ssl_bellinzona.sbatch for the
 # real, chained, full-budget run.
 #
 # Run from the repo root: sbatch slurm/train_ssl_trial_maskratio.sbatch

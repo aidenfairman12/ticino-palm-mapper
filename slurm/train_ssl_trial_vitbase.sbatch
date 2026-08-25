@@ -13,7 +13,7 @@
 
 # Trial run: larger (base) backbone vs. the real run's small backbone.
 # Fresh short run — deliberately NOT resumable, must not touch
-# checkpoints/bellinzona/. See train_ssl_bellinzona.sbatch for the real,
+# checkpoints/dinov2_mae/. See train_ssl_bellinzona.sbatch for the real,
 # chained, full-budget run.
 #
 # Run from the repo root: sbatch slurm/train_ssl_trial_vitbase.sbatch
