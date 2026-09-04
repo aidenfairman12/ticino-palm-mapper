@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import json
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -148,8 +149,10 @@ PAGE = """<!doctype html><meta charset="utf-8"><title>candidate review</title>
 </style>
 <div id="toolbar">
   <button onclick="exportVerdicts()">Export verdicts (CSV)</button>
+  <button onclick="clearSavedProgress()" title="Erases this page's autosaved verdicts/markers from this browser">Clear saved progress</button>
   <span id="progress">0 / {n} reviewed</span>
-  <span style="font-size:11px;color:#666">Click a card's image to focus it (P/N/U to verdict) — if the red crosshair isn't on the palm, click the actual palm(s) instead (each click adds a marker; multiple palms in one crop get multiple markers, exported as separate rows). Right-click an image to clear its markers. Unlabeled cards are skipped on export.</span>
+  <span id="restore-note" style="font-size:11px;color:#4fc3f7;display:none">restored from a previous session</span>
+  <span style="font-size:11px;color:#666">Click a card's image to focus it (P/N/U to verdict) — if the red crosshair isn't on the palm, click the actual palm(s) instead (each click adds a marker; multiple palms in one crop get multiple markers, exported as separate rows). Right-click an image to clear its markers. Unlabeled cards are skipped on export. Progress autosaves in this browser as you go — reopening this same file (even a different session) picks up where you left off; use Export once you're done with this batch.</span>
 </div>
 <h1>candidate review — {n} locations</h1>
 <p style="font-size:12px;color:#aaa">{subtitle}</p>
@@ -160,7 +163,64 @@ const markers = {{}};  // idx -> [[world_x, world_y], ...], accumulates across c
 const TOTAL = {n};
 let focusedIdx = null;
 
-function setVerdict(idx, verdict) {{
+// Autosave to localStorage keyed on this exact batch (candidates file + offset/
+// max-cards/min-prob, set by the Python side) so reopening the same generated
+// HTML file — even in a fresh browser session, hours or days later — restores
+// verdicts/markers instead of starting the batch over. Wrapped in try/catch
+// since localStorage can throw (private browsing, storage disabled, etc.) —
+// review still works without autosave in that case, it just won't persist.
+const PAGE_ID = {page_id};
+const STORAGE_KEY = 'palm_review::' + PAGE_ID;
+
+function saveProgress() {{
+  try {{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({{verdicts, markers}}));
+  }} catch (e) {{ /* ignore — autosave is best-effort */ }}
+}}
+
+function clearSavedProgress() {{
+  if (!confirm('Clear autosaved progress for this batch? This only affects this browser — already-exported CSVs are unaffected.')) return;
+  try {{ localStorage.removeItem(STORAGE_KEY); }} catch (e) {{ /* ignore */ }}
+  location.reload();
+}}
+
+function restoreProgress() {{
+  let saved;
+  try {{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    saved = JSON.parse(raw);
+  }} catch (e) {{ return; }}
+  if (!saved || !saved.verdicts) return;
+
+  let restoredAny = false;
+  for (const [idx, pts] of Object.entries(saved.markers || {{}})) {{
+    const card = document.querySelector(`[data-idx="${{idx}}"]`);
+    if (!card || !pts.length) continue;
+    const wrap = card.querySelector('.imgwrap');
+    const xmin = parseFloat(card.dataset.cropxmin), xmax = parseFloat(card.dataset.cropxmax);
+    const ymin = parseFloat(card.dataset.cropymin), ymax = parseFloat(card.dataset.cropymax);
+    pts.forEach(([worldX, worldY]) => {{
+      const fx = (worldX - xmin) / (xmax - xmin);
+      const fy = 1 - (worldY - ymin) / (ymax - ymin);
+      const marker = document.createElement('div');
+      marker.className = 'click-marker';
+      marker.style.left = (fx * 100) + '%';
+      marker.style.top = (fy * 100) + '%';
+      marker.style.display = 'block';
+      wrap.appendChild(marker);
+    }});
+    markers[idx] = pts;
+    restoredAny = true;
+  }}
+  for (const [idx, verdict] of Object.entries(saved.verdicts)) {{
+    setVerdict(idx, verdict, /*persist=*/false);
+    restoredAny = true;
+  }}
+  if (restoredAny) document.getElementById('restore-note').style.display = 'inline';
+}}
+
+function setVerdict(idx, verdict, persist = true) {{
   verdicts[idx] = verdict;
   const card = document.querySelector(`[data-idx="${{idx}}"]`);
   card.classList.remove('verdict-palm', 'verdict-not_palm', 'verdict-unsure');
@@ -168,6 +228,7 @@ function setVerdict(idx, verdict) {{
   card.querySelectorAll('.vb').forEach(b => b.classList.remove('active'));
   card.querySelector('.vb-' + (verdict === 'not_palm' ? 'not' : verdict)).classList.add('active');
   updateProgress();
+  if (persist) saveProgress();
 }}
 
 function updateProgress() {{
@@ -218,6 +279,7 @@ document.querySelectorAll('.card').forEach(card => {{
   function clearMarkers() {{
     markers[idx] = [];
     wrap.querySelectorAll('.click-marker').forEach(m => m.remove());
+    saveProgress();
   }}
 
   img.addEventListener('click', (e) => {{
@@ -239,6 +301,7 @@ document.querySelectorAll('.card').forEach(card => {{
     const worldX = xmin + fx * (xmax - xmin);
     const worldY = ymax - fy * (ymax - ymin);  // image y grows downward, world y grows upward
     markers[idx].push([worldX, worldY]);
+    saveProgress();
   }});
 
   img.addEventListener('contextmenu', (e) => {{
@@ -254,6 +317,8 @@ document.addEventListener('keydown', (e) => {{
   else if (key === 'n') setVerdict(focusedIdx, 'not_palm');
   else if (key === 'u') setVerdict(focusedIdx, 'unsure');
 }});
+
+restoreProgress();
 </script>
 """
 
@@ -330,9 +395,15 @@ def main() -> None:
         f"either way: a genuine unlabeled palm, or a hard negative that fooled the model."
     )
 
+    # Identifies this exact batch (same candidates file + offset/max-cards/min-prob)
+    # so the page's autosaved progress (browser localStorage, keyed on this id) is
+    # restored on reopening the same file, but a differently-generated page never
+    # collides with it. Doesn't need to be a hash — just stable and distinguishing.
+    page_id = json.dumps(f"{args.candidates}::{args.offset}::{args.max_cards}::{args.min_prob}")
+
     out_dir = ensure_dir(args.output.parent)
     out = args.output
-    out.write_text(PAGE.format(n=len(cards), cards="".join(cards), subtitle=subtitle, imgw=args.img_px))
+    out.write_text(PAGE.format(n=len(cards), cards="".join(cards), subtitle=subtitle, imgw=args.img_px, page_id=page_id))
     print(f"=== wrote {len(cards)} cards -> {out} ===")
     print(f"Open it: file://{out.resolve()}")
 
