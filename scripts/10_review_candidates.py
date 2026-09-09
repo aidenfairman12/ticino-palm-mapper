@@ -155,7 +155,7 @@ PAGE = """<!doctype html><meta charset="utf-8"><title>candidate review</title>
   <button onclick="clearSavedProgress()" title="Erases this page's autosaved verdicts/markers from this browser">Clear saved progress</button>
   <span id="progress">0 / {n} reviewed</span>
   <span id="restore-note" style="font-size:11px;color:#4fc3f7;display:none">restored from a previous session</span>
-  <span id="storage-warning" style="font-size:11px;color:#e07a5f;display:none">this browser won't autosave to local files (common in Safari) — click "Save progress (file)" periodically and "Load progress (file)" next time instead</span>
+  <span id="storage-warning" style="font-size:11px;color:#e07a5f;display:none">this browser won't autosave to local files — click "Save progress (file)" periodically and "Load progress (file)" next time instead</span>
   <span style="font-size:11px;color:#666">Click a card's image to focus it (P/N/U to verdict) — if the red crosshair isn't on the palm, click the actual palm(s) instead (each click adds a marker; multiple palms in one crop get multiple markers, exported as separate rows). Right-click an image to clear its markers. Unlabeled cards are skipped on export. Progress autosaves in this browser as you go where supported — reopening this same file (even a different session) picks up where you left off; use Export once you're done with this batch.</span>
 </div>
 <h1>candidate review — {n} locations</h1>
