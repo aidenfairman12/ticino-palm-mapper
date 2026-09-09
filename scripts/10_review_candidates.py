@@ -149,10 +149,14 @@ PAGE = """<!doctype html><meta charset="utf-8"><title>candidate review</title>
 </style>
 <div id="toolbar">
   <button onclick="exportVerdicts()">Export verdicts (CSV)</button>
+  <button onclick="saveProgressToFile()" title="Downloads a small JSON file with all verdicts/markers so far">Save progress (file)</button>
+  <button onclick="document.getElementById('load-progress-input').click()" title="Reload a JSON file saved earlier via 'Save progress (file)'">Load progress (file)</button>
+  <input type="file" id="load-progress-input" accept="application/json" style="display:none" onchange="loadProgressFromFile(event)"/>
   <button onclick="clearSavedProgress()" title="Erases this page's autosaved verdicts/markers from this browser">Clear saved progress</button>
   <span id="progress">0 / {n} reviewed</span>
   <span id="restore-note" style="font-size:11px;color:#4fc3f7;display:none">restored from a previous session</span>
-  <span style="font-size:11px;color:#666">Click a card's image to focus it (P/N/U to verdict) — if the red crosshair isn't on the palm, click the actual palm(s) instead (each click adds a marker; multiple palms in one crop get multiple markers, exported as separate rows). Right-click an image to clear its markers. Unlabeled cards are skipped on export. Progress autosaves in this browser as you go — reopening this same file (even a different session) picks up where you left off; use Export once you're done with this batch.</span>
+  <span id="storage-warning" style="font-size:11px;color:#e07a5f;display:none">this browser won't autosave to local files (common in Safari) — click "Save progress (file)" periodically and "Load progress (file)" next time instead</span>
+  <span style="font-size:11px;color:#666">Click a card's image to focus it (P/N/U to verdict) — if the red crosshair isn't on the palm, click the actual palm(s) instead (each click adds a marker; multiple palms in one crop get multiple markers, exported as separate rows). Right-click an image to clear its markers. Unlabeled cards are skipped on export. Progress autosaves in this browser as you go where supported — reopening this same file (even a different session) picks up where you left off; use Export once you're done with this batch.</span>
 </div>
 <h1>candidate review — {n} locations</h1>
 <p style="font-size:12px;color:#aaa">{subtitle}</p>
@@ -166,38 +170,55 @@ let focusedIdx = null;
 // Autosave to localStorage keyed on this exact batch (candidates file + offset/
 // max-cards/min-prob, set by the Python side) so reopening the same generated
 // HTML file — even in a fresh browser session, hours or days later — restores
-// verdicts/markers instead of starting the batch over. Wrapped in try/catch
-// since localStorage can throw (private browsing, storage disabled, etc.) —
-// review still works without autosave in that case, it just won't persist.
+// verdicts/markers instead of starting the batch over.
+//
+// localStorage for file:// pages is NOT reliable across browsers — Safari in
+// particular can silently refuse to persist it for local files (no error, it
+// just doesn't stick), which is why STORAGE_OK is checked explicitly below
+// with a real write+read+delete round trip rather than just wrapping calls in
+// try/catch and hoping. When it's unavailable, a visible warning is shown
+// (#storage-warning) instead of failing silently, and "Save/Load progress
+// (file)" — a plain JSON download/upload with no browser storage APIs
+// involved — is the reliable fallback that works the same everywhere.
 const PAGE_ID = {page_id};
 const STORAGE_KEY = 'palm_review::' + PAGE_ID;
 
+function storageWorks() {{
+  try {{
+    const t = '__palm_review_probe__';
+    localStorage.setItem(t, '1');
+    const ok = localStorage.getItem(t) === '1';
+    localStorage.removeItem(t);
+    return ok;
+  }} catch (e) {{
+    return false;
+  }}
+}}
+const STORAGE_OK = storageWorks();
+
 function saveProgress() {{
+  if (!STORAGE_OK) return;
   try {{
     localStorage.setItem(STORAGE_KEY, JSON.stringify({{verdicts, markers}}));
   }} catch (e) {{ /* ignore — autosave is best-effort */ }}
 }}
 
 function clearSavedProgress() {{
-  if (!confirm('Clear autosaved progress for this batch? This only affects this browser — already-exported CSVs are unaffected.')) return;
+  if (!confirm('Clear autosaved progress for this batch? This only affects this browser — already-exported CSVs / saved progress files are unaffected.')) return;
   try {{ localStorage.removeItem(STORAGE_KEY); }} catch (e) {{ /* ignore */ }}
   location.reload();
 }}
 
-function restoreProgress() {{
-  let saved;
-  try {{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    saved = JSON.parse(raw);
-  }} catch (e) {{ return; }}
-  if (!saved || !saved.verdicts) return;
-
+// Shared by both restore paths: localStorage (automatic, same browser) and a
+// loaded progress file (manual, works everywhere — see storageWorks() above).
+function applySavedState(saved) {{
+  if (!saved || !saved.verdicts) return false;
   let restoredAny = false;
   for (const [idx, pts] of Object.entries(saved.markers || {{}})) {{
     const card = document.querySelector(`[data-idx="${{idx}}"]`);
     if (!card || !pts.length) continue;
     const wrap = card.querySelector('.imgwrap');
+    wrap.querySelectorAll('.click-marker').forEach(m => m.remove());
     const xmin = parseFloat(card.dataset.cropxmin), xmax = parseFloat(card.dataset.cropxmax);
     const ymin = parseFloat(card.dataset.cropymin), ymax = parseFloat(card.dataset.cropymax);
     pts.forEach(([worldX, worldY]) => {{
@@ -217,7 +238,56 @@ function restoreProgress() {{
     setVerdict(idx, verdict, /*persist=*/false);
     restoredAny = true;
   }}
-  if (restoredAny) document.getElementById('restore-note').style.display = 'inline';
+  return restoredAny;
+}}
+
+function restoreProgress() {{
+  if (!STORAGE_OK) {{
+    document.getElementById('storage-warning').style.display = 'inline';
+    return;
+  }}
+  let saved;
+  try {{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    saved = JSON.parse(raw);
+  }} catch (e) {{ return; }}
+  if (applySavedState(saved)) document.getElementById('restore-note').style.display = 'inline';
+}}
+
+function saveProgressToFile() {{
+  const payload = JSON.stringify({{page_id: PAGE_ID, verdicts, markers}}, null, 1);
+  const blob = new Blob([payload], {{type: 'application/json'}});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'candidate_review_progress.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}}
+
+function loadProgressFromFile(event) {{
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {{
+    let saved;
+    try {{ saved = JSON.parse(reader.result); }} catch (e) {{
+      alert('Could not read that file — not valid JSON.');
+      return;
+    }}
+    if (saved.page_id && saved.page_id !== PAGE_ID) {{
+      if (!confirm('This progress file was saved from a different batch (different candidates/offset). Load it into this page anyway?')) return;
+    }}
+    if (applySavedState(saved)) {{
+      document.getElementById('restore-note').style.display = 'inline';
+      saveProgress();  // also stash it in localStorage if this browser supports it
+    }} else {{
+      alert('That file had no verdicts to load.');
+    }}
+  }};
+  reader.readAsText(file);
+  event.target.value = '';  // allow reloading the same filename again later
 }}
 
 function setVerdict(idx, verdict, persist = true) {{
