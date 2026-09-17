@@ -63,19 +63,26 @@ def load_feature_table(csv_path: Path) -> pd.DataFrame:
     one place a bad upstream extraction run would surface, so a couple of
     asserts here are worth more than they cost.
     """
-    raise NotImplementedError
-
+    df = pd.read_csv(csv_path)
+    feat_cols = feature_columns(df)
+    
+    assert not df[feat_cols].isna().to_numpy().any(), "One or more feature columns contain null values"
+    assert df["label"].isin([0,1]).all(), "lables arent all 0,1"  
+    assert df['fold_tile'].notna().all(), "At least one fold tile is na"
+ 
+    return df
+    
 
 def feature_columns(df: pd.DataFrame) -> list[str]:
     """Return every column in `df` that isn't in NON_FEATURE_COLUMNS —
     derive the feature list from the dataframe itself rather than hardcoding
     all ~85 names by hand, so it stays correct if scripts/15 adds/removes a
     feature later.
-    """
-    raise NotImplementedError
+    """    
+    return [x for x in df.columns if x not in NON_FEATURE_COLUMNS]
 
 
-def build_model(model_type: str, class_weight_multiplier: float, seed: int, **hyperparams):
+def build_model(model_type: str, seed: int, **hyperparams):
     """Construct an unfitted sklearn-compatible classifier.
 
     model_type == "rf": RandomForestClassifier. Worth exposing at least
@@ -94,17 +101,35 @@ def build_model(model_type: str, class_weight_multiplier: float, seed: int, **hy
     trees given fixed data — separate from the CV fold-assignment seed
     below.
     """
-    raise NotImplementedError
+    match model_type:
+        case "rf":
+            return RandomForestClassifier(n_estimators=hyperparams["n_estimators"],max_depth=hyperparams["max_depth"], min_samples_leaf=hyperparams["min_samples_leaf"], class_weight=hyperparams["class_weight"],random_state=seed)
 
-
+        case _: 
+            raise ValueError()
+            
 def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     """Same shape as linear_probe.py's evaluate_probe: a dict with keys
     accuracy, true_pos, true_neg, false_pos, false_neg — so results print
     in the identical format and existing eyeballing/tooling doesn't care
     which pipeline produced them.
     """
-    raise NotImplementedError
+    
+    acc = float((y_pred == y_true).mean())
+    tPos = int(((y_pred == 1) & (y_true == 1)).sum())
+    tNeg = int(((y_pred == 0) & (y_true == 0)).sum())
+    fPos = int(((y_pred == 1) & (y_true == 0)).sum())
+    fNeg = int(((y_pred == 0) & (y_true == 1)).sum())
+    
+    ret = {
+          "accuracy": acc,
+          "true_pos": tPos,
+          "true_neg": tNeg,
+          "false_pos": fPos,
+          "false_neg": fNeg
+        }
 
+    return ret
 
 def leave_one_tile_out_cv(
     df: pd.DataFrame, feat_cols: list[str], model_type: str,
@@ -121,7 +146,27 @@ def leave_one_tile_out_cv(
     the held-out tile's name — same ret[tile_name] = {...} structure
     linear_probe.py returns, for a diffable comparison.
     """
-    raise NotImplementedError
+    ret = {}
+    mask = df['label'] == 1
+    folds = sorted(df.loc[mask, "fold_tile"].unique())
+    n_folds = len(folds)
+    
+    negs = df.index[df["label"] == 0]
+    shuffled = np.random.default_rng(seed).permutation(negs.to_numpy())
+    neg_groups = [shuffled[i::n_folds] for i in range(n_folds)]
+    
+    
+    for tile_name, neg_ind in zip(folds, neg_groups):
+        pos_test_mask = (df["fold_tile"] == tile_name) & mask
+        neg_test_mask = df.index.isin(neg_ind)
+        test_mask = pos_test_mask | neg_test_mask
+
+        train_mask = ~test_mask
+        n_pos = df.loc[train_mask, "label"].sum()
+        n_neg = train_mask.sum() - n_pos
+        class_weights = {0 : 1, 1: (n_neg/n_pos) * class_weight_multiplier}
+        
+        build_model(df[train_mask], seed, hyperparams=)
 
 
 def summarize_feature_importance(fold_models: list, feat_cols: list[str]) -> pd.Series:

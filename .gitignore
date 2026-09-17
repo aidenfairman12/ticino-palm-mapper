@@ -48,3 +48,7 @@ candidate_scores/timing_trial.geojson
 # built containers / job logs
 *.sif
 logs/
+
+# VSCode remote tunnel launcher/log — machine-specific, not part of the codebase
+code-tunnel.sbatch
+tunnel.log
