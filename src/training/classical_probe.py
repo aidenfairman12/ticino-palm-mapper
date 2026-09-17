@@ -57,10 +57,35 @@ def build_model(model_type: str, seed: int, **hyperparams):
     `class_weight` (in **hyperparams) must arrive pre-resolved as a
     {0: w0, 1: w1} dict — this function has no visibility into the label
     distribution, so callers are responsible for scaling it themselves.
+    RandomForestClassifier takes that dict directly; XGBClassifier has no
+    class_weight concept at all, so it's translated to XGBoost's own
+    scale_pos_weight (a single scalar ratio) here — class 0's weight is
+    always fixed at 1 in this dict, so class_weight[1] IS that ratio.
+
+    xgboost is imported lazily, only inside the "xgboost" branch — it's an
+    optional dependency (not installed everywhere this file runs), and the
+    "rf" path shouldn't require it to even be present.
+
+    Note max_depth=None means something different per model: unlimited
+    depth for RandomForestClassifier, but merely "use XGBoost's own
+    default (6)" for XGBClassifier — it is NOT unlimited there. Don't
+    reuse the same max_depth grid values across both models expecting
+    equivalent behavior at None.
     """
     match model_type:
         case "rf":
             return RandomForestClassifier(n_estimators=hyperparams["n_estimators"],max_depth=hyperparams["max_depth"], min_samples_leaf=hyperparams["min_samples_leaf"], class_weight=hyperparams["class_weight"],random_state=seed)
+
+        case "xgboost":
+            from xgboost import XGBClassifier
+            return XGBClassifier(
+                n_estimators=hyperparams["n_estimators"],
+                max_depth=hyperparams["max_depth"],
+                min_child_weight=hyperparams["min_child_weight"],
+                scale_pos_weight=hyperparams["class_weight"][1],
+                random_state=seed,
+                eval_metric="logloss",
+            )
 
         case _:
             raise ValueError(f"unknown model_type: {model_type!r}")
@@ -165,10 +190,11 @@ def summarize_feature_importance(fold_models: list, feat_cols: list[str]) -> pd.
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Leave-one-tile-out RF/XGBoost eval of scripts/15's classical feature table.")
     p.add_argument("--features-csv", type=Path, required=True, help="Output of scripts/15_extract_classical_features.py.")
-    p.add_argument("--model", choices=["rf"], default="rf", help="xgboost intentionally not wired up yet — not installed, add when needed.")
+    p.add_argument("--model", choices=["rf", "xgboost"], default="rf")
     p.add_argument("--n-estimators", type=int, default=200)
-    p.add_argument("--max-depth", type=int, default=None)
-    p.add_argument("--min-samples-leaf", type=int, default=1)
+    p.add_argument("--max-depth", type=int, default=None, help="None means unlimited depth for rf, but only 'use XGBoost's own default (6)' for xgboost — not unlimited there.")
+    p.add_argument("--min-samples-leaf", type=int, default=1, help="rf only.")
+    p.add_argument("--min-child-weight", type=float, default=1.0, help="xgboost only — not the same statistic as min-samples-leaf, just the closest analog.")
     p.add_argument("--class-weight-multiplier", type=float, default=1.0)
     p.add_argument("--fold-seed", type=int, default=0, help="Controls only which negatives land in which fold — hold this fixed across a hyperparameter sweep.")
     p.add_argument("--model-seed", type=int, default=42, help="Controls only RandomForestClassifier's random_state — vary this alone to test a candidate's stability.")
@@ -182,9 +208,17 @@ def main() -> None:
     df = load_feature_table(args.features_csv)
     feat_cols = feature_columns(df)
     
+    # min_samples_leaf (rf) and min_child_weight (xgboost) aren't the same
+    # statistic, so only the one relevant to args.model gets passed through.
+    model_hyperparams = {"n_estimators": args.n_estimators, "max_depth": args.max_depth}
+    if args.model == "rf":
+        model_hyperparams["min_samples_leaf"] = args.min_samples_leaf
+    else:
+        model_hyperparams["min_child_weight"] = args.min_child_weight
+
     results, fold_models = leave_one_tile_out_cv(
         df, feat_cols, args.model, args.class_weight_multiplier, args.fold_seed, args.model_seed,
-        n_estimators=args.n_estimators, max_depth=args.max_depth, min_samples_leaf=args.min_samples_leaf,
+        **model_hyperparams,
     )
 
     print(f"\n{len(results)} folds:")
