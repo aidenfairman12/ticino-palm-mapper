@@ -1,45 +1,21 @@
 """
-Classical baseline: does a physically-grounded feature set (NDVI/CHM/
-spectral point+neighborhood stats + cross-date stability, from
-scripts/15_extract_classical_features.py) separate palm patches from
+Classical baseline: evaluates whether a physically-grounded feature set
+(NDVI/CHM/spectral point+neighborhood stats + cross-date stability, from
+scripts/15_extract_classical_features.py) separates palm patches from
 non-palm patches at least as well as the frozen-ViT-embedding + linear-
-probe pipeline (src/training/linear_probe.py)?
+probe pipeline (src/training/linear_probe.py).
 
-STUBBED ON PURPOSE — this file is yours to implement. Every function below
-has a docstring describing what it needs to do. No logic is filled in.
+Mirrors linear_probe.py's leave-one-tile-out CV design (same fold
+definition, same evaluate_probe-shaped confusion dict, same per-fold/
+pooled-accuracy print format) so results are directly comparable to the
+numbers linear_probe.py has been producing (82.9% pooled peak / 77.4%
+most recent, on dinov2_vanilla_fixed).
 
-This deliberately mirrors linear_probe.py's leave-one-tile-out CV design
-as closely as possible, operating on scripts/15's precomputed tabular
-feature table instead of live-extracted ViT embeddings — same fold
-definition, same evaluate_probe-shaped confusion dict, same printed
-per-fold/pooled-accuracy format, so a run of this script is directly
-comparable to the numbers linear_probe.py has been producing all along
-(82.9% pooled peak / 77.4% most recent, on dinov2_vanilla_fixed).
+Model: RandomForestClassifier by default; build_model is structured so
+"xgboost" can be added as a second --model option without a rewrite.
 
-CRITICAL DESIGN NOTE — read before implementing leave_one_tile_out_cv:
-scripts/15_extract_classical_features.py assigns EVERY row a `fold_tile`
-value, including negatives (whichever tile happens to cover that negative
-point). Do NOT naively group negatives by their own `fold_tile` the way
-positives are grouped — hard/random negatives essentially never land in
-the same tile as a confirmed positive (same reasoning documented in
-linear_probe.py's leave_one_tile_out_cv), so doing that would leave most
-folds' test sets with zero negatives, never actually testing specificity.
-Instead, replicate linear_probe.py's actual approach: derive n_folds from
-the number of distinct POSITIVE fold_tile values, then separately shuffle
-the negative rows (fixed seed, independent of fold_tile) into n_folds
-roughly-equal groups, one held out per fold alongside that fold's
-held-out positive tile.
-
-Model choice: starting with RandomForestClassifier (already in
-requirements.txt/environment.yml, no new dependency needed). Structure
-build_model so adding "xgboost" as a second --model option later is a
-small addition, not a rewrite — xgboost isn't installed yet, don't wire
-it up until it's actually needed.
-
-No GPU, no apptainer, no sbatch job needed for this file — it trains in
-seconds on this data size. Run it directly, locally in .venv or on the
-HPC via the module-loaded Python (module load Python/3.11.3-GCCcore-12.3.0
-gives a working scikit-learn/pandas environment without the container).
+Runs in seconds on this data size — no GPU/apptainer/sbatch needed.
+Use .venv locally, or `module load Python/3.11.3-GCCcore-12.3.0` on the HPC.
 """
 from __future__ import annotations
 
@@ -56,13 +32,10 @@ NON_FEATURE_COLUMNS = {"point_id", "label", "fold_tile", "x", "y"}
 
 
 def load_feature_table(csv_path: Path) -> pd.DataFrame:
-    """Load scripts/15_extract_classical_features.py's output CSV.
-
-    Sanity-check whatever you think is worth checking here (no NaNs in
-    feature columns, label is 0/1, fold_tile is non-null) — this is the
-    one place a bad upstream extraction run would surface, so a couple of
-    asserts here are worth more than they cost.
-    """
+    """Load scripts/15_extract_classical_features.py's output CSV and
+    validate its schema invariants (no NaNs in feature columns, binary
+    label, non-null fold_tile) — catches a bad upstream extraction run
+    before it silently corrupts training."""
     df = pd.read_csv(csv_path)
     feat_cols = feature_columns(df)
     
@@ -74,46 +47,28 @@ def load_feature_table(csv_path: Path) -> pd.DataFrame:
     
 
 def feature_columns(df: pd.DataFrame) -> list[str]:
-    """Return every column in `df` that isn't in NON_FEATURE_COLUMNS —
-    derive the feature list from the dataframe itself rather than hardcoding
-    all ~85 names by hand, so it stays correct if scripts/15 adds/removes a
-    feature later.
-    """    
+    """Return every column in `df` that isn't in NON_FEATURE_COLUMNS."""
     return [x for x in df.columns if x not in NON_FEATURE_COLUMNS]
 
 
 def build_model(model_type: str, seed: int, **hyperparams):
     """Construct an unfitted sklearn-compatible classifier.
 
-    model_type == "rf": RandomForestClassifier. Worth exposing at least
-    n_estimators, max_depth, min_samples_leaf as CLI-tunable (see
-    parse_args) — min_samples_leaf is probably your primary overfitting
-    guard given how few examples you have.
-
-    class_weight_multiplier mirrors linear_probe.py's pos_weight_multiplier
-    naming/reasoning exactly: 1.0 should fully compensate for the neg:pos
-    imbalance (sklearn's class_weight='balanced' does this out of the box),
-    other values should scale it — you'll likely need to hand-roll a
-    class_weight dict ({0: w0, 1: w1}) rather than the 'balanced' string if
-    you want the same tunable-multiplier behavior linear_probe.py has.
-
-    seed feeds RandomForestClassifier's own random_state, for reproducible
-    trees given fixed data — separate from the CV fold-assignment seed
-    below.
+    `class_weight` (in **hyperparams) must arrive pre-resolved as a
+    {0: w0, 1: w1} dict — this function has no visibility into the label
+    distribution, so callers are responsible for scaling it themselves.
     """
     match model_type:
         case "rf":
             return RandomForestClassifier(n_estimators=hyperparams["n_estimators"],max_depth=hyperparams["max_depth"], min_samples_leaf=hyperparams["min_samples_leaf"], class_weight=hyperparams["class_weight"],random_state=seed)
 
-        case _: 
-            raise ValueError()
+        case _:
+            raise ValueError(f"unknown model_type: {model_type!r}")
             
 def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    """Same shape as linear_probe.py's evaluate_probe: a dict with keys
-    accuracy, true_pos, true_neg, false_pos, false_neg — so results print
-    in the identical format and existing eyeballing/tooling doesn't care
-    which pipeline produced them.
-    """
+    """Return accuracy and confusion counts, matching linear_probe.py's
+    evaluate_probe output shape (accuracy, true_pos, true_neg, false_pos,
+    false_neg)."""
     
     acc = float((y_pred == y_true).mean())
     tPos = int(((y_pred == 1) & (y_true == 1)).sum())
@@ -133,29 +88,38 @@ def evaluate_predictions(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
 def leave_one_tile_out_cv(
     df: pd.DataFrame, feat_cols: list[str], model_type: str,
-    class_weight_multiplier: float, seed: int, **hyperparams,
-) -> dict:
+    class_weight_multiplier: float, fold_seed: int, model_seed: int, **hyperparams,
+) -> tuple[dict,list]:
     """Leave-one-tile-out CV, mirroring linear_probe.py's function of the
-    same name — see the CRITICAL DESIGN NOTE at the top of this file for
-    the one part that must NOT be a naive groupby(fold_tile) on both
-    labels: positives are grouped by fold_tile, negatives are grouped by a
-    separate fixed-seed shuffle into the same number of folds.
+    same name. Fits a fresh model per fold on the training rows, evaluates
+    on the held-out rows, and returns (per-fold results dict, fitted
+    fold models).
 
-    For each fold: fit a FRESH model (build_model) on the training rows
-    only, predict on the held-out rows, evaluate_predictions, store under
-    the held-out tile's name — same ret[tile_name] = {...} structure
-    linear_probe.py returns, for a diffable comparison.
+    fold_seed and model_seed are deliberately separate: fold_seed drives
+    ONLY which negatives land in which fold (hold it fixed across a
+    hyperparameter sweep so every candidate is compared on the identical
+    train/test split), while model_seed drives ONLY RandomForestClassifier's
+    own random_state (vary this alone to check whether a candidate's
+    accuracy is stable across different model-fit randomness, or just
+    got lucky). Mirrors linear_probe.py's own separation of concerns,
+    where the negative-shuffle is hardcoded independent of --seed.
     """
     ret = {}
+    fold_models = []
     mask = df['label'] == 1
     folds = sorted(df.loc[mask, "fold_tile"].unique())
     n_folds = len(folds)
-    
+
+    # scripts/15 assigns every row a fold_tile, including negatives, but
+    # negatives essentially never land in the same tile as a confirmed
+    # positive — grouping them by their own fold_tile would leave most
+    # folds' test sets with zero negatives. Shuffle them independently
+    # into n_folds groups instead, one held out per fold.
     negs = df.index[df["label"] == 0]
-    shuffled = np.random.default_rng(seed).permutation(negs.to_numpy())
+    shuffled = np.random.default_rng(fold_seed).permutation(negs.to_numpy())
     neg_groups = [shuffled[i::n_folds] for i in range(n_folds)]
-    
-    
+
+
     for tile_name, neg_ind in zip(folds, neg_groups):
         pos_test_mask = (df["fold_tile"] == tile_name) & mask
         neg_test_mask = df.index.isin(neg_ind)
@@ -164,22 +128,38 @@ def leave_one_tile_out_cv(
         train_mask = ~test_mask
         n_pos = df.loc[train_mask, "label"].sum()
         n_neg = train_mask.sum() - n_pos
-        class_weights = {0 : 1, 1: (n_neg/n_pos) * class_weight_multiplier}
+        # n_pos == 0 isn't reachable with the current dataset (every fold
+        # keeps the other ~100 positive tiles in training), but guard it
+        # anyway rather than risk a silent ZeroDivisionError — mirrors
+        # linear_probe.py's train_probe fallback to a neutral weight.
+        pos_weight = (n_neg / n_pos) * class_weight_multiplier if n_pos > 0 else 1.0
+        class_weights = {0: 1, 1: pos_weight}
+
+        test_feat = df.loc[test_mask, feat_cols]
+        test_label = df.loc[test_mask, "label"]
+        train_feat = df.loc[train_mask, feat_cols]
+        train_label = df.loc[train_mask, "label"]
+
+        model = build_model(model_type, model_seed, class_weight=class_weights, **hyperparams)
+        model.fit(train_feat, train_label)
+        y_pred = model.predict(test_feat)
+
+        ret[tile_name] = evaluate_predictions(test_label, y_pred)
+        fold_models.append(model)
+
+    return ret, fold_models
         
-        build_model(df[train_mask], seed, hyperparams=)
+        
 
 
 def summarize_feature_importance(fold_models: list, feat_cols: list[str]) -> pd.Series:
-    """Average feature_importances_ across every fold's fitted model
-    (leave_one_tile_out_cv fits a new model per fold — a single fold's
-    importances are noisy on this little data, averaging across all of
-    them is the more trustworthy summary), sorted descending. This is the
-    main artifact for the interpretation step discussed in the modeling
-    walkthrough — check whether the top features line up with real palm
-    biology (chm_peakiness, ndvi_contrast, temporal stability) or something
-    spurious/tile-specific.
-    """
-    raise NotImplementedError
+    """Average feature_importances_ across every fold's fitted model,
+    sorted descending — averaging reduces per-fold noise given how few
+    training examples each fold has."""
+    metric_arr = np.stack([m.feature_importances_ for m in fold_models])
+    metric_arr = metric_arr.mean(axis=0)
+    named_metrics = pd.Series(metric_arr,index=feat_cols).sort_values(ascending=False)
+    return named_metrics
 
 
 def parse_args() -> argparse.Namespace:
@@ -190,17 +170,44 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-depth", type=int, default=None)
     p.add_argument("--min-samples-leaf", type=int, default=1)
     p.add_argument("--class-weight-multiplier", type=float, default=1.0)
-    p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--fold-seed", type=int, default=0, help="Controls only which negatives land in which fold — hold this fixed across a hyperparameter sweep.")
+    p.add_argument("--model-seed", type=int, default=42, help="Controls only RandomForestClassifier's random_state — vary this alone to test a candidate's stability.")
     return p.parse_args()
 
 
 def main() -> None:
-    """Load the feature table, run leave_one_tile_out_cv, print per-fold
-    results + mean/pooled accuracy in the same format as linear_probe.py's
-    main() (see its tail end for the exact print statements to match), then
-    print the top-15 or so averaged feature importances.
-    """
-    raise NotImplementedError
+    """Load the feature table, run leave-one-tile-out CV, and print
+    per-fold/pooled accuracy plus the top feature importances."""
+    args = parse_args()
+    df = load_feature_table(args.features_csv)
+    feat_cols = feature_columns(df)
+    
+    results, fold_models = leave_one_tile_out_cv(
+        df, feat_cols, args.model, args.class_weight_multiplier, args.fold_seed, args.model_seed,
+        n_estimators=args.n_estimators, max_depth=args.max_depth, min_samples_leaf=args.min_samples_leaf,
+    )
+
+    print(f"\n{len(results)} folds:")
+    total_tp = total_tn = total_fp = total_fn = 0
+    accuracies = []
+    for tile_name, res in results.items():
+        print(f"  {tile_name}: {res}")
+        accuracies.append(res["accuracy"])
+        total_tp += res["true_pos"]
+        total_tn += res["true_neg"]
+        total_fp += res["false_pos"]
+        total_fn += res["false_neg"]
+        
+    mean_acc = sum(accuracies) / len(accuracies) if accuracies else float("nan")
+    total = total_tp + total_tn + total_fp + total_fn
+    pooled_acc = (total_tp + total_tn) / total if total else float("nan")
+    print(f"\nmean per-fold accuracy: {mean_acc:.3f}")
+    print(f"pooled accuracy (all folds combined): {pooled_acc:.3f} "
+        f"(tp={total_tp}, tn={total_tn}, fp={total_fp}, fn={total_fn})")
+
+    importances = summarize_feature_importance(fold_models, feat_cols)
+    print("\ntop feature importances:")
+    print(importances.head(15))
 
 
 if __name__ == "__main__":
