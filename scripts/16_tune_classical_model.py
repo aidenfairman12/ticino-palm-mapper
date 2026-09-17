@@ -81,7 +81,13 @@ def pooled_accuracy_and_spread(results: dict) -> tuple[float, float]:
     return pooled, float(np.std(accs))
 
 
-def run_grid(df: pd.DataFrame, feat_cols: list[str], model_type: str, fold_seed: int, model_seed: int) -> pd.DataFrame:
+def run_grid(df: pd.DataFrame, feat_cols: list[str], model_type: str, fold_seed: int, model_seed: int, out_csv: Path) -> pd.DataFrame:
+    """Runs the grid and, after EVERY combination, rewrites out_csv with
+    everything computed so far (cheap — this table is tiny) and flushes
+    stdout. A long sweep killed by a time limit (as happened to the first
+    RF sweep attempt, which produced a completely empty log because
+    Python fully-buffers stdout when it isn't a terminal) still leaves
+    real partial results on disk instead of losing everything."""
     grid = GRIDS[model_type]
     second_param_name = grid["second_param_name"]
     rows = []
@@ -99,7 +105,8 @@ def run_grid(df: pd.DataFrame, feat_cols: list[str], model_type: str, fold_seed:
         })
         print(f"[{i}/{len(combos)}] max_depth={max_depth} {second_param_name}={second_param} "
               f"class_weight_multiplier={class_weight_multiplier} -> "
-              f"pooled_accuracy={pooled:.3f} fold_std={spread:.3f}")
+              f"pooled_accuracy={pooled:.3f} fold_std={spread:.3f}", flush=True)
+        pd.DataFrame(rows).to_csv(out_csv, index=False)
     return pd.DataFrame(rows)
 
 
@@ -127,6 +134,7 @@ def stability_check(df: pd.DataFrame, feat_cols: list[str], model_type: str, fol
             )
             pooled, _ = pooled_accuracy_and_spread(results)
             seed_accs.append(pooled)
+            print(f"  stability seed={model_seed} -> pooled_accuracy={pooled:.3f}", flush=True)
         rows.append({
             **cand.to_dict(),
             "mean_pooled_accuracy_across_seeds": float(np.mean(seed_accs)),
@@ -152,20 +160,22 @@ def main() -> None:
 
     grid = GRIDS[args.model]
     n_combos = len(grid["max_depth"]) * len(grid["second_param"]) * len(grid["class_weight_multiplier"])
-    print(f"model={args.model}, grid: {n_combos} combinations, fold_seed={args.fold_seed} fixed throughout\n")
-    grid_results = run_grid(df, feat_cols, args.model, args.fold_seed, args.model_seed)
+    out_csv = args.features_csv.with_name(f"{args.features_csv.stem}_{args.model}_hparam_grid.csv")
+    print(f"model={args.model}, grid: {n_combos} combinations, fold_seed={args.fold_seed} fixed throughout, "
+          f"writing progress to {out_csv} after every combination\n", flush=True)
+    grid_results = run_grid(df, feat_cols, args.model, args.fold_seed, args.model_seed, out_csv)
 
     ranked = grid_results.sort_values("pooled_accuracy", ascending=False)
-    print("\n=== top candidates by pooled accuracy ===")
-    print(ranked.head(args.top_n).to_string(index=False))
+    print("\n=== top candidates by pooled accuracy ===", flush=True)
+    print(ranked.head(args.top_n).to_string(index=False), flush=True)
 
-    print(f"\n=== stability check: re-running top {args.top_n} across seeds {STABILITY_CHECK_SEEDS} ===")
+    print(f"\n=== stability check: re-running top {args.top_n} across seeds {STABILITY_CHECK_SEEDS} ===", flush=True)
     stability = stability_check(df, feat_cols, args.model, args.fold_seed, ranked.head(args.top_n))
-    print(stability.sort_values("mean_pooled_accuracy_across_seeds", ascending=False).to_string(index=False))
+    print(stability.sort_values("mean_pooled_accuracy_across_seeds", ascending=False).to_string(index=False), flush=True)
 
-    out_csv = args.features_csv.with_name(f"{args.features_csv.stem}_{args.model}_hparam_grid.csv")
-    grid_results.to_csv(out_csv, index=False)
-    print(f"\nfull grid written -> {out_csv}")
+    stability_csv = out_csv.with_name(out_csv.stem + "_stability.csv")
+    stability.to_csv(stability_csv, index=False)
+    print(f"\nfull grid -> {out_csv}\nstability check -> {stability_csv}", flush=True)
 
 
 if __name__ == "__main__":
