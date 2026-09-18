@@ -7,6 +7,8 @@ __pycache__/
 .venv/
 venv/
 env/
+# backup/parallel interpreters kept alongside the main one, e.g. .venv-py39-bak
+.venv-*/
 
 # node (deck/report build tooling)
 node_modules/
