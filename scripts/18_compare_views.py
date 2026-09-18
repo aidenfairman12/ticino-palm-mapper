@@ -174,7 +174,7 @@ def build_views(crop_a: np.ndarray, crop_march: np.ndarray | None,
 
 def sample_canopy_controls(tiles: TileSet, date: str, palms: gpd.GeoSeries,
                            n: int, min_dist_m: float, canopy_min_m: float,
-                           seed: int) -> list[Point]:
+                           seed: int, height_range: tuple[float, float] | None = None) -> list[Point]:
     """Points on canopy (CHM >= canopy_min_m) at least min_dist_m from any palm.
 
     Deliberately NOT uniform over the tile: the model already separates palm
@@ -199,6 +199,14 @@ def sample_canopy_controls(tiles: TileSet, date: str, palms: gpd.GeoSeries,
         if not (0 <= r < arr.shape[1] and 0 <= c < arr.shape[2]):
             continue
         if (arr[:, r, c] == 0).all() or arr[CHM, r, c] < canopy_min_m:
+            continue
+        # Height matching. Without it a flat --canopy-min-m floor manufactures
+        # a CHM separation whenever the palms sit below it: measured on
+        # bellinzona the confirmed palms are ~1.4 m against 14 m canopy
+        # controls, an AUC of 0.98 that says nothing except that the sampler
+        # was told to pick tall things. Negatives drawn that way would teach
+        # "short = palm", the mirror of the vegetation leak being fixed.
+        if height_range is not None and not (height_range[0] <= arr[CHM, r, c] <= height_range[1]):
             continue
         out.append(pt)
     if len(out) < n:
@@ -333,8 +341,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--n-palms", type=int, default=12)
     p.add_argument("--n-controls", type=int, default=12)
     p.add_argument("--crop-m", type=float, default=12.0, help="Crop side length in metres.")
-    p.add_argument("--canopy-min-m", type=float, default=2.0,
-                   help="Minimum CHM for a control — keeps controls on trees, not lawn.")
+    p.add_argument("--canopy-min-m", type=float, default=1.0,
+                   help="Minimum CHM for a control — keeps controls on woody vegetation, not lawn.")
+    p.add_argument("--match-height", action="store_true",
+                   help="Restrict controls to the palms' own CHM 5-95 percentile range. Without "
+                        "this, any separation on a height-derived statistic may just reflect the "
+                        "--canopy-min-m floor rather than anything about palms.")
     p.add_argument("--min-dist-m", type=float, default=25.0)
     p.add_argument("--blind", action="store_true")
     p.add_argument("--hillshade-exag", type=float, default=1.0,
@@ -367,10 +379,24 @@ def main() -> None:
     rng = np.random.default_rng(args.seed)
     pick = rng.permutation(len(palms_all))[:args.n_palms if args.mode == "panels" else len(palms_all)]
     palms = [palms_all.iloc[i] for i in pick]
+
+    height_range = None
+    if args.match_height:
+        heights = []
+        for pt in palms_all:
+            c = tiles.crop(pt, leafon, 1)
+            if c is not None:
+                heights.append(float(c[CHM, 1, 1]))
+        if len(heights) < 5:
+            raise SystemExit("--match-height needs at least 5 palms covered by the leaf-on date")
+        height_range = (float(np.percentile(heights, 5)), float(np.percentile(heights, 95)))
+        print(f"palm CHM 5-95 percentile: {height_range[0]:.2f}-{height_range[1]:.2f} m "
+              f"(median {np.median(heights):.2f} m) — controls restricted to this range")
+
     controls = sample_canopy_controls(
         tiles, leafon, palms_all,
         args.n_controls if args.mode == "panels" else max(args.n_controls, 200),
-        args.min_dist_m, args.canopy_min_m, args.seed)
+        args.min_dist_m, args.canopy_min_m, args.seed, height_range)
     print(f"using {len(palms)} palms and {len(controls)} canopy controls")
 
     if args.mode == "panels":
