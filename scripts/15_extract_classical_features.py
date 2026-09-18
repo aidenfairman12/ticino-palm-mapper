@@ -233,9 +233,18 @@ def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
     every row for that point — an evergreen palm should be stable across
     dates, unlike seasonal vegetation or transient imagery artifacts.
     """
+    # ddof=0, matching temporal_features_from_dicts' np.std. pandas' default
+    # is ddof=1, which made this TRAINING path disagree with the SCORING path
+    # by a factor of sqrt(n/(n-1)) — sqrt(2) at the two dates most points have,
+    # i.e. the model was fitted on systematically larger temporal_std values
+    # than it was ever shown at inference. ddof=0 is also the right estimator
+    # on its own terms: the 2-3 imagery dates are the whole set being described,
+    # not a sample drawn from some larger population of dates, and it stays
+    # defined at n=1 (0.0) instead of producing a NaN to be filled below.
+    pop_std = lambda s: s.std(ddof=0)  # noqa: E731
     agg = df.groupby("point_id").agg(
-        ndvi_temporal_std=("ndvi_point", "std") if "ndvi_point" in df else ("chm_point", lambda s: np.nan),
-        chm_temporal_std=("chm_point", "std"),
+        ndvi_temporal_std=("ndvi_point", pop_std) if "ndvi_point" in df else ("chm_point", lambda s: np.nan),
+        chm_temporal_std=("chm_point", pop_std),
         n_dates_covered=("fold_tile", "count"),
     )
     if "ndvi_point" in df:

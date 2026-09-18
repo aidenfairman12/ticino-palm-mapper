@@ -28,7 +28,21 @@ from sklearn.ensemble import RandomForestClassifier
 
 # Columns in scripts/15's output that are metadata, not model input —
 # everything else in the CSV is a feature.
-NON_FEATURE_COLUMNS = {"point_id", "label", "fold_tile", "x", "y"}
+#
+# n_dates_covered is excluded as a LEAK, not because it is metadata. It counts
+# covering non-nodata tile instances, and this project's tiles overlap, so it
+# partly encodes how near a tile seam a location sits plus which flights
+# covered it — neither of which has anything to do with palms. Two things make
+# it label-correlated rather than merely useless:
+#   - sample_negative_points draws a random TILE then a uniform point inside
+#     it, so locations in overlaps get several chances to be drawn; measured on
+#     lugano_example's tiling, negatives land in overlaps 1.21x more often than
+#     an area-uniform point would.
+#   - on the real feature table the split is clearer still — positives have
+#     median n_dates_covered 2.0 (max 12), negatives median 4.0 (max 8).
+# Still extracted by scripts/15 and kept in the CSV, since it is a useful
+# diagnostic for coverage; it just must not be a model input.
+NON_FEATURE_COLUMNS = {"point_id", "label", "fold_tile", "x", "y", "n_dates_covered"}
 
 
 def load_feature_table(csv_path: Path) -> pd.DataFrame:
