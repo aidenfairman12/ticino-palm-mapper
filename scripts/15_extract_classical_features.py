@@ -90,8 +90,13 @@ def window_stats(arr: np.ndarray, transform, point: shapely.geometry.Point, radi
     return point_val, window.mean(axis=(1, 2)), window.std(axis=(1, 2)), window.max(axis=(1, 2)), window.min(axis=(1, 2))
 
 
-def extract_features(tile_path: Path, point: shapely.geometry.Point, radii_m: list[float]) -> dict:
-    arr, transform, _ = load_tile(tile_path)
+def extract_features_from_array(arr: np.ndarray, transform, point: shapely.geometry.Point, radii_m: list[float]) -> dict:
+    """Same feature set as extract_features, but against an already-loaded
+    (arr, transform) pair rather than a tile path — lets a caller that's
+    caching tiles in memory (e.g. a full-grid scoring pass touching the
+    same handful of tiles repeatedly) avoid re-reading from disk per point,
+    same reasoning as score_candidates.py's tile cache.
+    """
     band_names = BAND_NAMES_6 if arr.shape[0] == 6 else BAND_NAMES_4
 
     feats: dict[str, float] = {}
@@ -114,6 +119,11 @@ def extract_features(tile_path: Path, point: shapely.geometry.Point, radii_m: li
     return feats
 
 
+def extract_features(tile_path: Path, point: shapely.geometry.Point, radii_m: list[float]) -> dict:
+    arr, transform, _ = load_tile(tile_path)
+    return extract_features_from_array(arr, transform, point, radii_m)
+
+
 def build_rows(points: gpd.GeoSeries, label: float, tile_boxes, radii_m: list[float]) -> list[dict]:
     rows = []
     for point_id, point in enumerate(points):
@@ -129,6 +139,25 @@ def build_rows(points: gpd.GeoSeries, label: float, tile_boxes, radii_m: list[fl
             )
             rows.append(feats)
     return rows
+
+
+def temporal_features_from_dicts(per_date_feats: list[dict]) -> dict:
+    """Same computation as add_temporal_features, but for one point's list
+    of per-date feature dicts directly rather than a groupby over a
+    DataFrame — for streaming callers (e.g. full-grid scoring) that never
+    materialize the whole dataset as a table the way build_rows does.
+    """
+    ndvi_vals = [f["ndvi_point"] for f in per_date_feats if "ndvi_point" in f]
+    chm_vals = [f["chm_point"] for f in per_date_feats if "chm_point" in f]
+    out = {
+        "chm_temporal_std": float(np.std(chm_vals)) if len(chm_vals) > 1 else 0.0,
+        "chm_temporal_range": float(max(chm_vals) - min(chm_vals)) if chm_vals else 0.0,
+        "n_dates_covered": len(per_date_feats),
+    }
+    if ndvi_vals:
+        out["ndvi_temporal_std"] = float(np.std(ndvi_vals)) if len(ndvi_vals) > 1 else 0.0
+        out["ndvi_temporal_range"] = float(max(ndvi_vals) - min(ndvi_vals))
+    return out
 
 
 def add_temporal_features(df: pd.DataFrame) -> pd.DataFrame:
