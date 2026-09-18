@@ -109,19 +109,42 @@ def points_to_density_target(
     points, tile_transform, tile_shape: tuple[int, int], sigma_px: float
 ) -> np.ndarray:
     """Creates density map from points using gaussian filter.
+
+    gaussian_filter is sum-preserving, so arr.sum() == the number of points
+    that fell inside this tile — the density map's count semantics depend on
+    that, which is why co-located points must ACCUMULATE (np.add.at), not
+    overwrite. Two palms rounding to the same pixel are mass 2.0, not 1.0;
+    getting this wrong silently undercounts exactly the tight-cluster case
+    this formulation exists to handle.
+
+    Tile membership is half-open — [left, right) x (bottom, top] — matching
+    what rowcol actually produces: a point on the left/top edge maps to a
+    valid pixel of THIS tile, one on the right/bottom edge maps to the
+    neighbouring tile. A `within` test excluded all four edges (dropping
+    valid left/top-edge points), while `intersects` would have included all
+    four (double-counting edge points into both adjacent tiles).
     """
     H, W = tile_shape[0], tile_shape[1]
     left, bottom, right, top = array_bounds(H, W, tile_transform)
-    mask = points.geometry.within(box(left,bottom,right, top))
 
-    tile_points = points[mask]
-    rows, cols = rowcol(tile_transform, tile_points.geometry.x, tile_points.geometry.y)
-    
-    arr = np.zeros((H,W))
-    arr[rows,cols] = 1
-    
+    x = points.geometry.x.to_numpy()
+    y = points.geometry.y.to_numpy()
+    mask = (x >= left) & (x < right) & (y > bottom) & (y <= top)
+
+    arr = np.zeros((H, W))
+    if not mask.any():
+        return arr
+
+    rows, cols = rowcol(tile_transform, x[mask], y[mask])
+    # Exact arithmetic keeps these in range; clip guards float rounding at
+    # a boundary, where floor() can land one past the last valid index.
+    rows = np.clip(np.asarray(rows, dtype=int), 0, H - 1)
+    cols = np.clip(np.asarray(cols, dtype=int), 0, W - 1)
+
+    np.add.at(arr, (rows, cols), 1)
+
     arr = scipy.ndimage.gaussian_filter(arr, sigma=sigma_px)
-    
+
     return arr
 
 def spatial_split(
