@@ -276,6 +276,19 @@ def report(prob, true_xy, src, thr, nms_m, match_m, link_m, verbose=True):
 
         groups = cluster_points(true_xy, link_m)
         multi = sorted((g for g in groups.values() if len(g) > 1), key=len, reverse=True)
+        # NMS suppresses any peak within nms_m of a stronger one, so palms closer
+        # together than 2*nms_m cannot both survive REGARDLESS of the surface. A
+        # MERGED verdict under that condition says nothing about the model — it
+        # was preordained by the readout. Warn rather than quietly report it.
+        if len(true_xy) > 1:
+            d, _ = cKDTree(true_xy).query(true_xy, k=2)
+            min_spacing = float(d[:, 1].min())
+            if nms_m >= min_spacing / 2:
+                print(f"\n  [WARN] --nms-radius-m {nms_m} cannot resolve palms {min_spacing:.2f} m apart:")
+                print(f"         suppression spans {2*nms_m:.1f} m, so any pair closer than that merges")
+                print(f"         by construction. Re-run with --nms-radius-m {min_spacing/3:.2f} or less")
+                print(f"         before reading any MERGED verdict below as a model result.")
+
         print(f"\n  per-cluster (single-linkage at {link_m} m) — the actual question:")
         if not multi:
             print("    no multi-palm clusters in this tile")
