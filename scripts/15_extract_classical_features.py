@@ -62,14 +62,81 @@ from pathlib import Path
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import rasterio
 import shapely
 from rasterio.transform import rowcol
+from shapely.geometry import box
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.data.dataset import load_confirmed_points, load_tile  # noqa: E402
-from src.data.probe_dataset import find_covering_tiles, load_tile_bounds, sample_negative_points  # noqa: E402
-from src.training.pretrain_ssl import glob_tiles  # noqa: E402
+from src.data.config import PROJECT_CRS  # noqa: E402
+
+# The obvious versions of these five helpers already exist in src/data/dataset.py
+# and src/data/probe_dataset.py, but BOTH of those modules import torch at the
+# top level (for unrelated Dataset classes) — and torch + xgboost loaded in the
+# same process segfaults (a known OpenMP-runtime conflict between the two
+# libraries). This script (and anything that dynamically loads it, like
+# src/inference/score_candidates_classical.py) has no other reason to need
+# torch, so these are duplicated here, torch-free, rather than imported.
+
+
+def load_tile(path: Path) -> tuple[np.ndarray, "rasterio.Affine", "rasterio.crs.CRS"]:
+    with rasterio.open(path) as src:
+        arr = src.read()
+        transform = src.transform
+        crs = src.crs
+    assert arr.dtype == np.float32, f"expected float32, got {arr.dtype} in {path}"
+    assert arr.shape[0] in (4, 6), f"expected 4 or 6 channels but got {arr.shape[0]} from {path}"
+    assert crs.to_epsg() == int(PROJECT_CRS.split(":")[1]), f"expected EPSG:2056, got {crs} in {path}"
+    return arr, transform, crs
+
+
+def load_confirmed_points(geojson_path: Path) -> gpd.GeoDataFrame:
+    return gpd.read_file(geojson_path)
+
+
+def load_tile_bounds(tile_paths: list[Path]) -> list[tuple[Path, "shapely.geometry.base.BaseGeometry"]]:
+    ret = []
+    for path in tile_paths:
+        with rasterio.open(path) as src:
+            coords = src.bounds
+        ret.append((path, box(*coords)))
+    return ret
+
+
+def find_covering_tiles(point, tile_boxes: list[tuple[Path, "shapely.geometry.base.BaseGeometry"]]) -> list[Path]:
+    return [path for path, tile_box in tile_boxes if point.within(tile_box)]
+
+
+def sample_negative_points(
+    positive_points: gpd.GeoSeries, candidate_points: gpd.GeoSeries, tile_paths: list[Path],
+    n_negatives: int, min_distance_m: float, seed: int,
+) -> list[tuple[float, float]]:
+    results = []
+    rng = np.random.default_rng(seed)
+    while len(results) < n_negatives:
+        idx = rng.integers(0, len(tile_paths))
+        with rasterio.open(tile_paths[idx]) as src:
+            coords = src.bounds
+        x, y = rng.uniform(coords.left, coords.right), rng.uniform(coords.bottom, coords.top)
+        point = shapely.geometry.Point(x, y)
+        if positive_points.distance(point).min() >= min_distance_m and candidate_points.distance(point).min() >= min_distance_m:
+            results.append((x, y))
+    return results
+
+
+def glob_tiles(tile_dirs: list[Path], in_chans: int) -> list[Path]:
+    """Same behavior as src.training.pretrain_ssl.glob_tiles, duplicated
+    here rather than imported — that module pulls in torch purely for this
+    trivial suffix-glob, and torch + xgboost loaded in the same process
+    segfaults (a known OpenMP-runtime conflict between the two libraries).
+    This module has no other reason to need torch at all.
+    """
+    suffix = "*_rgbchm.tif" if in_chans == 4 else "*_nirchm.tif"
+    tile_paths = []
+    for d in tile_dirs:
+        tile_paths.extend(sorted(d.glob(suffix)))
+    return tile_paths
 
 BAND_NAMES_6 = ["nir", "r", "g", "b", "ndvi", "chm"]
 BAND_NAMES_4 = ["r", "g", "b", "chm"]
