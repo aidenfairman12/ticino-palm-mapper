@@ -140,55 +140,90 @@ def cluster_points(xy_arr: np.ndarray, link_m: float) -> dict[int, list[int]]:
     return dict(groups)
 
 
-def render(prob, true_xy, peak_xy, groups, src, out_path: Path, pad_m: float) -> None:
-    """Whole-tile view plus a zoomed panel per multi-palm cluster."""
+
+def load_backdrop(feature_tif: Path | None, shape):
+    """(rgb HxWx3 uint8, chm HxW) from the feature stack, or (None, None).
+
+    Band layout follows the stack convention: 6-channel is [NIR,R,G,B,NDVI,CHM]
+    so RGB is bands 2-4 and CHM is band 6; 4-channel is [R,G,B,CHM]. The 2-98
+    percentile per-channel stretch matches scripts/10_review_candidates.py's
+    _rgb_crop, so a crop here looks like the review cards rather than being
+    stretched differently and inviting a false comparison.
+    """
+    if feature_tif is None:
+        return None, None
+    with rasterio.open(feature_tif) as src:
+        arr = src.read()
+        if (src.height, src.width) != shape:
+            raise SystemExit(
+                f"{feature_tif.name} is {src.height}x{src.width} but the surface is "
+                f"{shape[0]}x{shape[1]} — these are different tiles"
+            )
+    if arr.shape[0] == 6:
+        rgb_idx, chm_idx = (1, 2, 3), 5
+    else:
+        rgb_idx, chm_idx = (0, 1, 2), 3
+    rgb = np.zeros(shape + (3,), dtype=np.uint8)
+    for j, b in enumerate(rgb_idx):
+        band = arr[b].astype(np.float32)
+        lo, hi = np.percentile(band, (2, 98))
+        rgb[..., j] = (np.clip((band - lo) / (hi - lo + 1e-6), 0, 1) * 255).astype(np.uint8)
+    return rgb, arr[chm_idx]
+
+
+def render(prob, true_xy, peak_xy, groups, src, out_path: Path, pad_m: float,
+           rgb=None, chm=None) -> None:
+    """Rows = whole tile then one per multi-palm cluster; columns = RGB, CHM,
+    probability. Side by side is the point: a bright patch means nothing until
+    you can see whether the imagery under it holds one crown or several."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    multi = [g for g in groups.values() if len(g) > 1]
-    multi.sort(key=len, reverse=True)
-    multi = multi[:5]
-    n = 1 + len(multi)
-    fig, axes = plt.subplots(1, n, figsize=(6 * n, 6.4))
-    axes = np.atleast_1d(axes)
-
-    def draw(ax, extent_px, title):
-        r0, r1, c0, c1 = extent_px
-        ax.imshow(np.where(np.isfinite(prob), prob, 0.0)[r0:r1, c0:c1],
-                  cmap="magma", vmin=0, vmax=1, interpolation="nearest")
-        for arr, style in ((true_xy, dict(marker="+", c="#39FF14", s=150, lw=2.0)),
-                           (peak_xy, dict(marker="o", c="#00D4FF", s=70,
-                                          facecolors="none", lw=1.6))):
-            if len(arr) == 0:
-                continue
-            rr, cc = rowcol(src.transform, arr[:, 0], arr[:, 1])
-            rr, cc = np.atleast_1d(rr), np.atleast_1d(cc)
-            keep = (rr >= r0) & (rr < r1) & (cc >= c0) & (cc < c1)
-            if keep.any():
-                ax.scatter(cc[keep] - c0, rr[keep] - r0, **style)
-        ax.set_title(title, fontsize=11)
-        ax.set_xticks([]); ax.set_yticks([])
-
-    draw(axes[0], (0, prob.shape[0], 0, prob.shape[1]),
-         f"whole tile — {len(true_xy)} palms, {len(peak_xy)} peaks")
-
+    multi = sorted((g for g in groups.values() if len(g) > 1), key=len, reverse=True)[:4]
+    panels = [("whole tile", (0, prob.shape[0], 0, prob.shape[1]), len(true_xy))]
     res = abs(src.transform.a)
-    for ax, g in zip(axes[1:], multi):
+    for g in multi:
         gxy = true_xy[g]
         rr, cc = rowcol(src.transform, gxy[:, 0], gxy[:, 1])
         pad = int(pad_m / res)
-        r0, r1 = max(0, min(rr) - pad), min(prob.shape[0], max(rr) + pad)
-        c0, c1 = max(0, min(cc) - pad), min(prob.shape[1], max(cc) + pad)
-        near = sum(1 for p in peak_xy
-                   if r0 <= rowcol(src.transform, p[0], p[1])[0] < r1
-                   and c0 <= rowcol(src.transform, p[0], p[1])[1] < c1)
-        draw(ax, (r0, r1, c0, c1), f"cluster of {len(g)} — {near} peaks in view")
+        panels.append((f"cluster of {len(g)}",
+                       (max(0, min(rr) - pad), min(prob.shape[0], max(rr) + pad),
+                        max(0, min(cc) - pad), min(prob.shape[1], max(cc) + pad)), len(g)))
 
-    fig.suptitle("green + = confirmed palm     blue o = detected peak", fontsize=11)
+    cols = [("probability", prob, dict(cmap="magma", vmin=0, vmax=1))]
+    if rgb is not None:
+        cols = [("RGB", rgb, {}), ("CHM", chm, dict(cmap="viridis"))] + cols
+
+    fig, axes = plt.subplots(len(panels), len(cols),
+                             figsize=(5.2 * len(cols), 5.4 * len(panels)), squeeze=False)
+    for i, (label, (r0, r1, c0, c1), n) in enumerate(panels):
+        for j, (cname, data, kw) in enumerate(cols):
+            ax = axes[i][j]
+            img = data[r0:r1, c0:c1]
+            if cname == "probability":
+                img = np.where(np.isfinite(img), img, 0.0)
+            ax.imshow(img, interpolation="nearest", **kw)
+            for arr, style in ((true_xy, dict(marker="+", c="#39FF14", s=170, lw=2.2)),
+                               (peak_xy, dict(marker="o", edgecolors="#00D4FF", s=90,
+                                              facecolors="none", lw=1.8))):
+                if len(arr) == 0:
+                    continue
+                pr, pc = rowcol(src.transform, arr[:, 0], arr[:, 1])
+                pr, pc = np.atleast_1d(pr), np.atleast_1d(pc)
+                keep = (pr >= r0) & (pr < r1) & (pc >= c0) & (pc < c1)
+                if keep.any():
+                    ax.scatter(pc[keep] - c0, pr[keep] - r0, **style)
+            ax.set_xticks([]); ax.set_yticks([])
+            if i == 0:
+                ax.set_title(cname, fontsize=13)
+            if j == 0:
+                ax.set_ylabel(f"{label}\n({n} palms)", fontsize=11)
+
+    fig.suptitle("green + = confirmed palm     blue o = detected peak", fontsize=12)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=130, bbox_inches="tight")
+    fig.savefig(out_path, dpi=120, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -207,6 +242,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--sweep", action="store_true",
                    help="Report the metrics across a grid of thresholds and NMS radii.")
     p.add_argument("--png", type=Path, default=None)
+    p.add_argument("--feature-tif", type=Path, default=None,
+                   help="The matching *_nirchm.tif feature stack. Adds RGB and CHM columns "
+                        "to the PNG so the surface can be compared against what is on the ground.")
     p.add_argument("--pad-m", type=float, default=15.0, help="Zoom margin around a cluster.")
     return p.parse_args()
 
@@ -284,8 +322,9 @@ def main() -> None:
         peak_xy, _ = report(prob, true_xy, src, args.threshold, args.nms_radius_m,
                             args.match_dist_m, args.cluster_link_m)
         if args.png:
+            rgb, chm = load_backdrop(args.feature_tif, prob.shape)
             render(prob, true_xy, peak_xy, cluster_points(true_xy, args.cluster_link_m),
-                   src, args.png, args.pad_m)
+                   src, args.png, args.pad_m, rgb, chm)
             print(f"\nwrote {args.png}")
 
 
