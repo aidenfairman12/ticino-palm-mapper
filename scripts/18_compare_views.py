@@ -295,7 +295,13 @@ def run_ndvi(tiles: TileSet, palms: list[Point], controls: list[Point],
     if len(P) < 5 or len(C) < 5:
         raise SystemExit(f"too few points covered by BOTH dates (palms {len(P)}, controls {len(C)})")
 
-    print(f"\ncovered by both {march} and {leafon}: {len(P)} palms, {len(C)} canopy controls")
+    print(f"\ncovered by both {march} and {leafon}: {len(P)}/{len(palms)} palms, "
+          f"{len(C)}/{len(controls)} canopy controls "
+          f"({len(C)/max(len(controls),1)*100:.0f}% of sampled canopy is in the {march} footprint)")
+    if len(P) < 20:
+        print(f"  [WARN] only {len(P)} palms — AUC standard error is roughly "
+              f"{(0.25/len(P))**0.5:.2f}, so treat these as indicative only.")
+        print("         Pass every points file to --points to pull more palms into the overlap.")
     stats = {
         "NDVI March": (P[:, 0], C[:, 0], "higher = evergreen"),
         "NDVI August": (P[:, 1], C[:, 1], ""),
@@ -382,16 +388,27 @@ def main() -> None:
 
     height_range = None
     if args.match_height:
+        # The range must come from the SAME palms the comparison will run on.
+        # In ndvi mode that is the both-dates intersection, which can differ
+        # sharply from the leaf-on set: on bellinzona the March-covered palms
+        # are 1.4 m median against 4.8 m for the leaf-on set, so matching to
+        # the latter puts controls 4 m taller than the palms they are meant to
+        # control for, and CHM keeps a separation the matching was added to
+        # remove.
         heights = []
         for pt in palms_all:
             c = tiles.crop(pt, leafon, 1)
-            if c is not None:
-                heights.append(float(c[CHM, 1, 1]))
+            if c is None:
+                continue
+            if args.mode == "ndvi" and tiles.crop(pt, march, 1) is None:
+                continue
+            heights.append(float(c[CHM, 1, 1]))
         if len(heights) < 5:
             raise SystemExit("--match-height needs at least 5 palms covered by the leaf-on date")
         height_range = (float(np.percentile(heights, 5)), float(np.percentile(heights, 95)))
-        print(f"palm CHM 5-95 percentile: {height_range[0]:.2f}-{height_range[1]:.2f} m "
-              f"(median {np.median(heights):.2f} m) — controls restricted to this range")
+        print(f"palm CHM 5-95 percentile over the {len(heights)} palms in the comparison set: "
+              f"{height_range[0]:.2f}-{height_range[1]:.2f} m (median {np.median(heights):.2f} m) "
+              f"— controls restricted to this range")
 
     controls = sample_canopy_controls(
         tiles, leafon, palms_all,
