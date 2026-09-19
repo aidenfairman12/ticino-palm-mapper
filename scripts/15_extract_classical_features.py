@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from collections import OrderedDict
 from pathlib import Path
 
@@ -215,6 +216,9 @@ def extract_features(tile_path: Path, point: shapely.geometry.Point, radii_m: li
 def build_rows(points: gpd.GeoSeries, label: float, tile_boxes, radii_m: list[float]) -> list[dict]:
     rows = []
     _cache: OrderedDict = OrderedDict()
+    n = len(points)
+    kind = "positive" if label else "negative"
+    t0 = time.time()
     for point_id, point in enumerate(points):
         covering = find_covering_tiles(point, tile_boxes)
         for tile_path in covering:
@@ -227,6 +231,18 @@ def build_rows(points: gpd.GeoSeries, label: float, tile_boxes, radii_m: list[fl
                 y=point.y,
             )
             rows.append(feats)
+        done = point_id + 1
+        # This is the slow step in the whole pipeline (a full tile read per
+        # covering tile, even cached), and previously ran with zero output —
+        # a dropped SSH connection during a silent multi-minute stretch here
+        # is indistinguishable from a hang until it is too late. Every 100
+        # points, or always for a negative set small enough that 100 never
+        # fires, so progress is visible either way.
+        if done % 100 == 0 or done == n:
+            elapsed = time.time() - t0
+            eta = elapsed / done * (n - done)
+            print(f"  {kind}: {done}/{n} points ({len(rows)} rows so far) — "
+                  f"{elapsed:.0f}s elapsed, ~{eta:.0f}s remaining", flush=True)
     return rows
 
 
