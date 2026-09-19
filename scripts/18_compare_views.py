@@ -55,6 +55,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import rasterio
+import time
 from rasterio.transform import rowcol
 from shapely.geometry import Point, box
 
@@ -83,16 +84,34 @@ def glob_tiles(tile_dirs: list[Path]) -> list[Path]:
 class TileSet:
     """Tiles indexed by date, with bounds cached and arrays loaded lazily.
 
-    Bounds are read once up front (cheap, ~3 ms/tile) so point-in-tile lookups
-    do not reopen files; full arrays are ~25 MB each and are cached behind a
-    cap, the same reasoning as score_candidates_classical's LRU.
+    Bounds are read once up front (~3 ms/tile on local disk) so point-in-tile
+    lookups do not reopen files; full arrays are ~25 MB each and are cached
+    behind a cap, the same reasoning as score_candidates_classical's LRU.
+
+    Measured hang: on bellinzona (~5100 tiles per date directory, on a
+    network-mounted filesystem) this init ran past a 10-minute salloc limit
+    and was killed, with zero output up to that point. Cause: GDAL's default
+    open behaviour lists the CONTAINING DIRECTORY on every single
+    rasterio.open() call, looking for sidecar files (.aux.xml, .ovr, world
+    files) to auto-attach. With 5000+ entries in that directory and a
+    network filesystem where a listing is a real round trip rather than a
+    cheap local syscall, that is 5100 directory scans of a 5000-entry
+    directory just to read bounds. GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR
+    turns that off — each open touches only the file it names — and this
+    is the standard fix for exactly this symptom on network-backed tile
+    archives, not something specific to this codebase.
     """
 
     def __init__(self, tile_paths: list[Path], max_cached: int = 24):
         self.by_date: dict[str, list[tuple[Path, object]]] = {}
-        for p in tile_paths:
+        t0 = time.time()
+        for i, p in enumerate(tile_paths):
             with rasterio.open(p) as src:
                 self.by_date.setdefault(date_of(p), []).append((p, box(*src.bounds)))
+            if (i + 1) % 500 == 0:
+                print(f"  ...indexed {i+1}/{len(tile_paths)} tile bounds "
+                      f"({time.time()-t0:.0f}s elapsed)")
+        print(f"indexed {len(tile_paths)} tiles in {time.time()-t0:.1f}s")
         self._cache: dict[Path, tuple[np.ndarray, object]] = {}
         self._order: list[Path] = []
         self.max_cached = max_cached
@@ -419,6 +438,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    # Disabled once, for the whole run: GDAL's default open behaviour lists
+    # the containing directory on every rasterio.open() (auto-discovering
+    # sidecar .aux.xml/.ovr files), and with 5000+ tiles in one directory on
+    # a network filesystem that turned "index the tiles" into a run that
+    # exceeded a 10-minute salloc and was killed with no output. This applies
+    # to every open the process makes — indexing AND every later cache-miss
+    # tile load — not just the one loop it was first noticed in.
+    import os
+    os.environ.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
+
     args = parse_args()
     tiles = TileSet(glob_tiles(args.tile_dirs))
     if not tiles.dates:
