@@ -176,6 +176,16 @@ def build_views(crop_a: np.ndarray, crop_march: np.ndarray | None,
     rgb = np.dstack([stretch(crop_a[b]) for b in (RED, GREEN, BLUE)])
     views.append(("RGB", rgb, {}))
 
+    if seasonal:
+        # True colour is what a human actually judges "still green" or "gone
+        # bare" from — the NDVI-drop number should be checkable against this,
+        # not just against a colour-mapped NDVI panel.
+        if crop_march is not None:
+            rgb_march = np.dstack([stretch(crop_march[b]) for b in (RED, GREEN, BLUE)])
+        else:
+            rgb_march = np.full((crop_a.shape[1], crop_a.shape[2], 3), np.nan)
+        views.append(("RGB March", rgb_march, {}))
+
     # NIR into red: healthy vegetation glows, and crown structure separates from
     # background greenness in a way natural colour flattens out.
     cir = np.dstack([stretch(crop_a[b]) for b in (NIR, RED, GREEN)])
@@ -206,7 +216,7 @@ def build_views(crop_a: np.ndarray, crop_march: np.ndarray | None,
 def sample_canopy_controls(tiles: TileSet, date: str, palms: gpd.GeoSeries,
                            n: int, min_dist_m: float, canopy_min_m: float,
                            seed: int, height_range: tuple[float, float] | None = None,
-                           pts_per_tile: int = 400) -> list[Point]:
+                           pts_per_tile: int = 400, also_covered_by: str | None = None) -> list[Point]:
     """Points on canopy (CHM >= canopy_min_m) at least min_dist_m from any palm.
 
     Deliberately NOT uniform over the tile: the model already separates palm
@@ -256,6 +266,13 @@ def sample_canopy_controls(tiles: TileSet, date: str, palms: gpd.GeoSeries,
             # that way would teach "short = palm", the mirror of the
             # tall-vegetation leak this whole investigation is about.
             if height_range is not None and not (height_range[0] <= arr[CHM, r, c] <= height_range[1]):
+                continue
+            # Restrict to the OVERLAP footprint when a caller (grid mode) needs
+            # both dates at the same point. Without this, most candidates would
+            # be rejected here anyway — on bellinzona the early date covers
+            # ~29% of the area — but silently, with no way to tell "canopy is
+            # rare" apart from "this location just isn't in the early flight".
+            if also_covered_by is not None and tiles.crop(pt, also_covered_by, 1) is None:
                 continue
             out.append(pt)
         if tiles_visited % 200 == 0:
@@ -383,6 +400,86 @@ def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
         print(f"wrote {key}  — do not open until you have scored yourself")
 
 
+def run_grid(tiles: TileSet, palm_candidates: list[Point], controls: list[Point],
+            march: str, leafon: str, half_px: int, out: Path,
+            exag: float = 1.0, smooth_px: float = 2.0, zoom: int = 4, dpi: int = 150) -> None:
+    """Visual validation of the NDVI-drop evergreen filter, across as many
+    examples as --n-palms/--n-controls allow, sorted by the SAME statistic
+    `ndvi` mode reports (Aug-Mar NDVI, centre pixel) so you can check whether
+    a location the number calls "deciduous" actually looks like it lost its
+    leaves, and one it calls "evergreen" actually stayed green.
+
+    Every row shows real spring and summer imagery side by side — true
+    colour AND colour-mapped NDVI — with the computed drop value in the row
+    label. A few things to look for while scanning it:
+      - rows near the top (lowest drop) should look about the same in both
+        seasons; rows near the bottom should visibly go from green/leafy in
+        summer to bare/brown in spring.
+      - the "PALM" rows (known confirmed palms, if any fall in the early-date
+        footprint) are marked and should cluster near the low-drop end —
+        that is the whole premise the filter rests on. If they do not, the
+        filter is not trustworthy regardless of what the AUC number said.
+      - a location that looks wrong for its position in the sort (e.g.
+        clearly bare in March but a LOW reported drop) points at a real
+        problem — nodata, cloud, a shadow, or a genuinely confusing case —
+        worth 10x zooming that one row rather than trusting the aggregate.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    rows = [(p, "PALM") for p in palm_candidates] + [(p, "canopy") for p in controls]
+    entries = []
+    for pt, label in rows:
+        ca = tiles.crop(pt, leafon, half_px)
+        cm = tiles.crop(pt, march, half_px)
+        if ca is None or cm is None:
+            continue
+        # Centre pixel, matching run_ndvi's definition exactly — this is meant
+        # to be checkable against the numbers already reported, not a new stat.
+        drop = float(ca[NDVI, half_px, half_px] - cm[NDVI, half_px, half_px])
+        entries.append((drop, pt, label, ca, cm))
+    if not entries:
+        raise SystemExit("no location had usable crops in BOTH dates — "
+                          "check --tile-dirs coverage and --march-date/--leafon-date")
+    entries.sort(key=lambda e: e[0])  # ascending: most evergreen-looking first
+    n_pal = sum(1 for _, _, label, _, _ in entries if label == "PALM")
+    print(f"{len(entries)} locations with both-date coverage ({n_pal} confirmed palms), "
+          f"sorted by NDVI drop ascending")
+
+    keep_names = {"RGB March", "RGB", "NDVI March", "NDVI leaf-on"}
+    built = []
+    for drop, pt, label, ca, cm in entries:
+        views = build_views(ca, cm, exag, smooth_px, seasonal=True)
+        views = [(n, upsample_nearest(img, zoom), kw) for n, img, kw in views if n in keep_names]
+        built.append((views, label, drop))
+
+    ncol = len(built[0][0])
+    side_px = 2 * half_px * zoom
+    panel_in = min(max(side_px / dpi, 2.0), 6.0)
+    fig, axes = plt.subplots(len(built), ncol, figsize=(panel_in * ncol, panel_in * 1.05 * len(built)),
+                             squeeze=False, dpi=dpi)
+    for i, (views, label, drop) in enumerate(built):
+        for j, (name, img, kw) in enumerate(views):
+            ax = axes[i][j]
+            ax.imshow(img, interpolation="nearest", **kw)
+            ax.set_xticks([]); ax.set_yticks([])
+            if i == 0:
+                ax.set_title(name, fontsize=10)
+        marker = "  <- PALM" if label == "PALM" else ""
+        axes[i][0].set_ylabel(f"#{i}\ndrop={drop:+.3f}{marker}", fontsize=8,
+                              rotation=0, ha="right", va="center")
+
+    fig.suptitle("sorted by NDVI drop (leaf-on - March), ascending: top = looks-evergreen "
+                 "by the number, bottom = looks-deciduous. Does the imagery agree?",
+                 fontsize=11, y=1.0)
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    print(f"wrote {out}  ({len(built)} rows)")
+
+
 def run_ndvi(tiles: TileSet, palms: list[Point], controls: list[Point],
              march: str, leafon: str, out: Path | None) -> None:
     from sklearn.metrics import roc_auc_score
@@ -444,7 +541,12 @@ def run_ndvi(tiles: TileSet, palms: list[Point], controls: list[Point],
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("mode", choices=["panels", "ndvi"])
+    p.add_argument("mode", choices=["panels", "ndvi", "grid"],
+                   help="panels: side-by-side views of sampled locations. ndvi: numeric "
+                        "palm-vs-canopy separability (ROC AUC). grid: visual check of the "
+                        "NDVI-drop evergreen filter itself — many locations, real spring+summer "
+                        "imagery, sorted by the same statistic ndvi mode reports, so you can see "
+                        "whether the number and the image agree before trusting it as a filter.")
     p.add_argument("--tile-dirs", type=Path, nargs="+", required=True,
                    help="One per date; the date is read from each directory name.")
     p.add_argument("--points", type=Path, nargs="+", required=True, help="Confirmed-palm GeoJSONs.")
@@ -527,15 +629,22 @@ def main() -> None:
         ).drop_duplicates().reset_index(drop=True)
         print(f"+{len(extra)} exclusion-only points ({len(exclude_all)} total kept clear of controls)")
 
+    if args.mode == "grid" and len(tiles.dates) < 2:
+        raise SystemExit("grid mode needs 2+ --tile-dirs (an early date and a leaf-on date) "
+                          "to compute the NDVI drop it is meant to validate")
+
     rng = np.random.default_rng(args.seed)
     candidates = palms_all
-    if args.mode == "panels" and args.require_march and len(tiles.dates) > 1:
+    # grid mode always needs march-covered palms — there is nothing to sort or
+    # show otherwise — so it behaves as --require-march regardless of the flag.
+    need_march_candidates = (args.mode == "grid") or (args.mode == "panels" and args.require_march)
+    if need_march_candidates and len(tiles.dates) > 1:
         covered = [i for i, pt in enumerate(palms_all) if tiles.crop(pt, march, 4) is not None]
-        print(f"--require-march: {len(covered)}/{len(palms_all)} palms have {march} coverage")
+        print(f"{len(covered)}/{len(palms_all)} palms have {march} coverage (needed for {args.mode} mode)")
         if not covered:
-            raise SystemExit(f"no palm is covered by {march} — drop --require-march or check --march-date")
+            raise SystemExit(f"no palm is covered by {march} — check --march-date")
         candidates = palms_all.iloc[covered].reset_index(drop=True)
-    pick = rng.permutation(len(candidates))[:args.n_palms if args.mode == "panels" else len(candidates)]
+    pick = rng.permutation(len(candidates))[:args.n_palms if args.mode in ("panels", "grid") else len(candidates)]
     palms = [candidates.iloc[i] for i in pick]
 
     height_range = None
@@ -564,14 +673,19 @@ def main() -> None:
 
     controls = sample_canopy_controls(
         tiles, leafon, exclude_all,
-        args.n_controls if args.mode == "panels" else max(args.n_controls, 200),
-        args.min_dist_m, args.canopy_min_m, args.seed, height_range)
+        args.n_controls if args.mode in ("panels", "grid") else max(args.n_controls, 200),
+        args.min_dist_m, args.canopy_min_m, args.seed, height_range,
+        also_covered_by=march if args.mode == "grid" else None)
     print(f"using {len(palms)} palms and {len(controls)} canopy controls")
 
     if args.mode == "panels":
         run_panels(tiles, palms, controls, march, leafon,
                    max(4, round(args.crop_m / RES_M / 2)), args.blind, args.out, args.seed,
                    args.hillshade_exag, args.hillshade_smooth_px, args.zoom, args.dpi)
+    elif args.mode == "grid":
+        run_grid(tiles, palms, controls, march, leafon,
+                max(4, round(args.crop_m / RES_M / 2)), args.out,
+                args.hillshade_exag, args.hillshade_smooth_px, args.zoom, args.dpi)
     else:
         run_ndvi(tiles, palms, controls, march, leafon, args.out)
 
