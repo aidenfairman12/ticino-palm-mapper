@@ -20,6 +20,7 @@ Use .venv locally, or `module load Python/3.11.3-GCCcore-12.3.0` on the HPC.
 from __future__ import annotations
 
 import argparse
+import time
 from pathlib import Path
 
 import numpy as np
@@ -148,6 +149,9 @@ def leave_one_tile_out_cv(
     mask = df['label'] == 1
     folds = sorted(df.loc[mask, "fold_tile"].unique())
     n_folds = len(folds)
+    print(f"leave-one-tile-out CV: {n_folds} folds, {len(df):,} rows "
+          f"({int(mask.sum()):,} positive, {int((~mask).sum()):,} negative)")
+    t0 = time.time()
 
     # scripts/15 assigns every row a fold_tile, including negatives, but
     # negatives essentially never land in the same tile as a confirmed
@@ -185,6 +189,11 @@ def leave_one_tile_out_cv(
 
         ret[tile_name] = evaluate_predictions(test_label, y_pred)
         fold_models.append(model)
+        done = len(ret)
+        elapsed = time.time() - t0
+        eta = elapsed / done * (n_folds - done)
+        print(f"  fold {done}/{n_folds} ({tile_name}) done — "
+              f"{elapsed:.0f}s elapsed, ~{eta:.0f}s remaining", flush=True)
 
     return ret, fold_models
         
