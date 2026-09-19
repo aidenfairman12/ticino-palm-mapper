@@ -284,7 +284,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--confirmed-points", type=Path, required=True, help="Path to the MASTER confirmed-palms GeoJSON.")
     p.add_argument("--scouted-points", type=Path, default=None)
     p.add_argument("--reviewed-positives", type=Path, default=None, help="active_learning_confirmed_palms.geojson")
-    p.add_argument("--hard-negatives", type=Path, default=None, help="active_learning_hard_negatives.geojson")
+    p.add_argument("--hard-negatives", type=Path, nargs="+", default=None,
+                   help="One or more hard-negative GeoJSONs (e.g. active_learning_hard_negatives.geojson "
+                        "and harvested_deciduous_negatives.geojson), pooled together.")
     p.add_argument("--n-negatives", type=int, default=30)
     p.add_argument("--min-distance-m", type=float, default=20.0)
     p.add_argument("--radii-m", type=float, nargs="+", default=[1.0, 3.0, 5.0])
@@ -322,8 +324,10 @@ def main() -> None:
         seed=args.seed,
     )
     if args.hard_negatives is not None:
-        hard_neg = gpd.read_file(args.hard_negatives)
-        negatives = negatives + [(pt.x, pt.y) for pt in hard_neg.geometry]
+        for hn_path in args.hard_negatives:
+            hard_neg = gpd.read_file(hn_path)
+            negatives = negatives + [(pt.x, pt.y) for pt in hard_neg.geometry]
+            print(f"  +{len(hard_neg)} hard negatives from {hn_path.name}")
     negative_geoms = gpd.GeoSeries([shapely.geometry.Point(x, y) for x, y in negatives], crs=positive_geoms.crs)
     print(f"negatives: {len(negative_geoms)} total")
 
