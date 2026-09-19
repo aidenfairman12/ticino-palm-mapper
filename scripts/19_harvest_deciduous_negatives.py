@@ -166,43 +166,67 @@ def load_exclusion_tree(paths: list[Path]) -> tuple[cKDTree | None, np.ndarray]:
 
 
 def process_tile_pair(march_path: Path, leafon_path: Path, args, excl_tree: cKDTree | None,
-                      thresholds_to_sweep: list[float]) -> tuple[list[dict], dict]:
-    """Returns (harvested rows at args.drop_threshold, sweep counts dict)."""
+                      thresholds_to_sweep: list[float]) -> tuple[list[dict], dict, int, int]:
+    """Returns (harvested rows at args.drop_threshold, sweep counts dict,
+    pixels the shadow gate excluded at drop_threshold, pixels that would have
+    passed WITHOUT the gate at drop_threshold)."""
     march_arr, march_tr, _ = load_tile(march_path)
     leafon_arr, leafon_tr, leafon_crs = load_tile(leafon_path)
     if march_arr.shape != leafon_arr.shape:
         print(f"  [skip] {march_path.name}: shape mismatch march {march_arr.shape} "
               f"vs leafon {leafon_arr.shape}")
-        return [], {}
+        return [], {}, 0, 0
     # Grid-alignment assumption already relied on throughout this pipeline
     # (dense_classical.py's dense_feature_stack asserts the same thing across
     # SAME-date neighbour tiles); here it is ACROSS dates for the SAME cell,
     # which every prior cross-tile check in this project has held for.
     if not march_tr.almost_equals(leafon_tr):
         print(f"  [skip] {march_path.name}: transform mismatch vs {leafon_path.name}")
-        return [], {}
+        return [], {}, 0, 0
 
     valid = valid_mask(march_arr) & valid_mask(leafon_arr)
     if not valid.any():
-        return [], {}
+        return [], {}, 0, 0
 
-    canopy = leafon_arr[CHM] >= args.canopy_min_m
+    # CHM alone cannot tell a tree from a building — a house roof is easily
+    # >1m tall, so a height-only mask lets buildings into the "canopy" used
+    # both for candidate selection AND (see below) the shadow gate's
+    # neighbour-averaging, silently reintroducing the exact building-
+    # contamination problem the canopy-masking fix was meant to remove, just
+    # filtered through height instead of brightness. NDVI distinguishes them:
+    # a building is flat/low on NDVI regardless of height; live vegetation
+    # (evergreen or deciduous-in-leaf) is not. Using the LEAF-ON date's NDVI
+    # specifically, since that is when essentially anything genuinely
+    # vegetated — evergreen or deciduous — should read as vegetation; an
+    # evergreen's March NDVI is exactly the signal being tested, not a safe
+    # thing to gate on here.
+    canopy = (leafon_arr[CHM] >= args.canopy_min_m) & (leafon_arr[NDVI] >= args.veg_ndvi_min)
     drop = leafon_arr[NDVI] - march_arr[NDVI]
 
     march_bright = march_arr[RED].astype(np.float64) + march_arr[GREEN] + march_arr[BLUE]
     leafon_bright = leafon_arr[RED].astype(np.float64) + leafon_arr[GREEN] + leafon_arr[BLUE]
-    march_ratio = local_brightness_and_ratio(march_bright, canopy, args.shadow_window_m)
-    leafon_ratio = local_brightness_and_ratio(leafon_bright, canopy, args.shadow_window_m)
-    shadowed = (march_ratio < args.shadow_ratio) | (leafon_ratio < args.shadow_ratio)
+    if args.no_shadow_gate:
+        shadowed = np.zeros_like(canopy, dtype=bool)
+    else:
+        march_ratio = local_brightness_and_ratio(march_bright, canopy, args.shadow_window_m)
+        leafon_ratio = local_brightness_and_ratio(leafon_bright, canopy, args.shadow_window_m)
+        shadowed = (march_ratio < args.shadow_ratio) | (leafon_ratio < args.shadow_ratio)
 
-    base_mask = valid & canopy & ~shadowed
+    base_mask = valid & canopy
+    base_mask_no_shadow_gate = base_mask & ~shadowed
 
-    sweep = {t: int((base_mask & (drop >= t)).sum()) for t in thresholds_to_sweep}
+    sweep = {t: int((base_mask_no_shadow_gate & (drop >= t)).sum()) for t in thresholds_to_sweep}
+    # How many points the gate itself is responsible for removing, isolated
+    # from the drop threshold — the actual answer to "is this even doing
+    # anything", rather than the theoretical argument for why it might.
+    excluded_by_gate = int((base_mask & shadowed & (drop >= args.drop_threshold)).sum())
+    passing_before_gate = int((base_mask & (drop >= args.drop_threshold)).sum())
+    base_mask = base_mask_no_shadow_gate
 
     accept_mask = base_mask & (drop >= args.drop_threshold)
     rows_rc = np.argwhere(accept_mask)
     if len(rows_rc) == 0:
-        return [], sweep
+        return [], sweep, excluded_by_gate, passing_before_gate
 
     # Exclude anything near an existing confirmed/scouted point — a control
     # sampled near a known palm could be an unlabeled neighbour, not a
@@ -219,7 +243,7 @@ def process_tile_pair(march_path: Path, leafon_path: Path, args, excl_tree: cKDT
         xs, ys = np.atleast_1d(xs), np.atleast_1d(ys)
 
     if len(rows_rc) == 0:
-        return [], sweep
+        return [], sweep, excluded_by_gate, passing_before_gate
 
     # Cap per tile: neighbouring accepted pixels are not independent samples,
     # and a training set of every qualifying pixel in Bellinzona would be
@@ -238,7 +262,7 @@ def process_tile_pair(march_path: Path, leafon_path: Path, args, excl_tree: cKDT
             "chm_m": float(leafon_arr[CHM, r, c]),
             "harvest_method": "march_ndvi_drop_filter",
         })
-    return out, sweep
+    return out, sweep, excluded_by_gate, passing_before_gate
 
 
 def parse_args() -> argparse.Namespace:
@@ -249,6 +273,12 @@ def parse_args() -> argparse.Namespace:
                    help="Confirmed/scouted palm GeoJSONs to stay --min-dist-m away from.")
     p.add_argument("--in-chans", type=int, default=6, choices=[4, 6])
     p.add_argument("--canopy-min-m", type=float, default=1.0)
+    p.add_argument("--veg-ndvi-min", type=float, default=0.3,
+                   help="Minimum leaf-on NDVI, together with --canopy-min-m, for something to "
+                        "count as vegetation rather than a tall non-vegetated object (a building "
+                        "is easily >1m tall, so height alone does not tell it apart from a tree). "
+                        "This mask is used both for candidate selection and for the shadow "
+                        "gate's neighbour-averaging.")
     p.add_argument("--drop-threshold", type=float, default=0.20,
                    help="Minimum NDVI drop (leaf-on - March) to call a location confidently "
                         "deciduous. Pick this by eye against scripts/18 grid-mode output — "
@@ -260,6 +290,15 @@ def parse_args() -> argparse.Namespace:
                         "brightness, on EITHER date, is excluded as likely-shadowed rather than "
                         "trusted as a confident negative. Heuristic, self-relative — tune it.")
     p.add_argument("--shadow-window-m", type=float, default=3.0)
+    p.add_argument("--no-shadow-gate", action="store_true",
+                   help="Disable the shadow gate entirely. NDVI's ratio structure already "
+                        "cancels a UNIFORM shadow almost exactly, so the gate's real value is "
+                        "narrower than it first sounds — mainly locations where the illumination "
+                        "regime itself differs between dates (e.g. a neighbouring tree leafing "
+                        "out and casting a new shadow), not shadow in general. Run once with "
+                        "and once without this to compare the harvested sets directly rather "
+                        "than trusting the theory; the per-run shadow-gate-impact line reports "
+                        "how many points the gate actually removes.")
     p.add_argument("--per-tile-cap", type=int, default=5,
                    help="Max harvested points per tile — keeps the set spatially diverse "
                         "rather than many near-duplicate pixels from one qualifying patch.")
@@ -289,12 +328,16 @@ def main() -> None:
     sweep_values = sorted({0.10, 0.15, 0.20, 0.25, 0.30, 0.35, round(args.drop_threshold, 2)})
     all_rows: list[dict] = []
     sweep_totals = {t: 0 for t in sweep_values}
+    total_excluded_by_gate = total_passing_before_gate = 0
     t0 = time.time()
     for i, key in enumerate(paired):
-        rows, sweep = process_tile_pair(march_tiles[key], leafon_tiles[key], args, excl_tree, sweep_values)
+        rows, sweep, excl_gate, pass_before = process_tile_pair(
+            march_tiles[key], leafon_tiles[key], args, excl_tree, sweep_values)
         all_rows.extend(rows)
         for t, n in sweep.items():
             sweep_totals[t] += n
+        total_excluded_by_gate += excl_gate
+        total_passing_before_gate += pass_before
         if (i + 1) % 200 == 0:
             print(f"  ...{i+1}/{len(paired)} tile pairs, {len(all_rows)} harvested so far "
                   f"({time.time()-t0:.0f}s elapsed)")
@@ -305,6 +348,18 @@ def main() -> None:
     for t in sweep_values:
         marker = "  <- --drop-threshold" if abs(t - args.drop_threshold) < 1e-9 else ""
         print(f"  {t:.2f}: {sweep_totals[t]:>10,d} pixels{marker}")
+
+    if args.no_shadow_gate:
+        print("\nshadow gate: DISABLED (--no-shadow-gate)")
+    elif total_passing_before_gate > 0:
+        pct = total_excluded_by_gate / total_passing_before_gate * 100
+        print(f"\nshadow gate impact at drop-threshold={args.drop_threshold}: excluded "
+              f"{total_excluded_by_gate:,}/{total_passing_before_gate:,} otherwise-qualifying "
+              f"pixels ({pct:.1f}%). Compare against a --no-shadow-gate run before trusting "
+              f"either number in isolation — this is a heuristic, not a validated method.")
+    else:
+        print("\nshadow gate impact: nothing qualified before the gate even applied — "
+              "nothing to measure here.")
 
     print(f"\nharvested {len(all_rows)} points at drop-threshold={args.drop_threshold} "
           f"(capped at {args.per_tile_cap}/tile)")
