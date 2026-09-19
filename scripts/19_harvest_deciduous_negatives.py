@@ -116,20 +116,42 @@ import os
 os.environ.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
 
 
-def local_brightness_and_ratio(rgb_sum: np.ndarray, window_m: float) -> np.ndarray:
-    """Per-pixel ratio of its own brightness to its local neighbourhood mean.
+def local_brightness_and_ratio(rgb_sum: np.ndarray, canopy_mask: np.ndarray, window_m: float,
+                               min_canopy_frac: float = 0.1) -> np.ndarray:
+    """Per-pixel ratio of its own brightness to the MEAN BRIGHTNESS OF NEARBY
+    CANOPY ONLY. < 1 means darker than the other trees around it.
 
-    < 1 means darker than its surroundings. uniform_filter with a truncated
-    (constant, cval=0) window plus a ones-mask divisor gives the TRUE local
-    mean even at tile edges — same technique as dense_classical.py's
-    _truncated_window_mean, duplicated narrowly rather than imported since
-    that helper is private to that module.
+    Restricted to canopy neighbours specifically, not "whatever is nearby" —
+    an earlier version averaged over the whole window regardless of what was
+    in it, which meant a sunlit tree standing next to a bright roof or
+    driveway got its local mean pulled UP by the building and could register
+    as "darker than its surroundings" despite being perfectly lit and simply
+    a naturally darker-toned species. That failure mode concentrates exactly
+    in garden/residential settings — trees next to houses — which is the
+    population this whole harvest most needs good examples from. Masking the
+    average to canopy pixels removes the building-contamination pathway: the
+    comparison is now "darker than other nearby TREES", which is what a
+    shadow-from-an-adjacent-tree or self-shading case actually looks like.
+
+    Where too little canopy exists nearby to form a meaningful comparison
+    (an isolated specimen with no neighbouring canopy in the window — plenty
+    of ornamental palms are exactly this) the ratio defaults to 1.0 (treated
+    as NOT shadowed) rather than excluded: absence of a comparison should not
+    default to penalizing isolated trees, and isolated specimens are common
+    for exactly the ornamental plantings this project cares about.
+
+    uniform_filter with a truncated (constant, cval=0) window plus a
+    canopy-weighted divisor gives the TRUE local canopy mean even at tile
+    edges — same normalized-convolution technique as dense_classical.py's
+    _truncated_window_mean, duplicated narrowly since that helper is private
+    to that module.
     """
     size = max(3, 2 * round(window_m / RES_M) + 1)
-    ones = np.ones_like(rgb_sum)
-    counts = ndimage.uniform_filter(ones, size=size, mode="constant", cval=0.0) * (size * size)
-    local_sum = ndimage.uniform_filter(rgb_sum, size=size, mode="constant", cval=0.0) * (size * size)
-    local_mean = local_sum / np.maximum(counts, 1.0)
+    mask = canopy_mask.astype(np.float64)
+    canopy_count = ndimage.uniform_filter(mask, size=size, mode="constant", cval=0.0) * (size * size)
+    canopy_sum = ndimage.uniform_filter(rgb_sum * mask, size=size, mode="constant", cval=0.0) * (size * size)
+    enough = canopy_count >= max(1.0, min_canopy_frac * size * size)
+    local_mean = np.where(enough, canopy_sum / np.maximum(canopy_count, 1.0), rgb_sum)
     return rgb_sum / np.maximum(local_mean, 1e-6)
 
 
@@ -169,8 +191,8 @@ def process_tile_pair(march_path: Path, leafon_path: Path, args, excl_tree: cKDT
 
     march_bright = march_arr[RED].astype(np.float64) + march_arr[GREEN] + march_arr[BLUE]
     leafon_bright = leafon_arr[RED].astype(np.float64) + leafon_arr[GREEN] + leafon_arr[BLUE]
-    march_ratio = local_brightness_and_ratio(march_bright, args.shadow_window_m)
-    leafon_ratio = local_brightness_and_ratio(leafon_bright, args.shadow_window_m)
+    march_ratio = local_brightness_and_ratio(march_bright, canopy, args.shadow_window_m)
+    leafon_ratio = local_brightness_and_ratio(leafon_bright, canopy, args.shadow_window_m)
     shadowed = (march_ratio < args.shadow_ratio) | (leafon_ratio < args.shadow_ratio)
 
     base_mask = valid & canopy & ~shadowed
