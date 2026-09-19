@@ -384,6 +384,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--march-date", default=None, help="Default: earliest date found.")
     p.add_argument("--leafon-date", default=None, help="Default: latest date found.")
     p.add_argument("--n-palms", type=int, default=12)
+    p.add_argument("--require-march", action="store_true",
+                   help="panels mode with 2+ --tile-dirs: sample only palms covered by the early "
+                        "date, so every rendered row has real seasonal columns instead of the "
+                        "sampler drawing mostly from the ~90% of palms outside a small early-flight "
+                        "footprint and rendering blank NDVI-March/drop columns for most of them.")
     p.add_argument("--n-controls", type=int, default=12)
     p.add_argument("--crop-m", type=float, default=12.0, help="Crop side length in metres.")
     p.add_argument("--canopy-min-m", type=float, default=1.0,
@@ -423,8 +428,15 @@ def main() -> None:
     print(f"{len(palms_all)} unique confirmed palms loaded")
 
     rng = np.random.default_rng(args.seed)
-    pick = rng.permutation(len(palms_all))[:args.n_palms if args.mode == "panels" else len(palms_all)]
-    palms = [palms_all.iloc[i] for i in pick]
+    candidates = palms_all
+    if args.mode == "panels" and args.require_march and len(tiles.dates) > 1:
+        covered = [i for i, pt in enumerate(palms_all) if tiles.crop(pt, march, 4) is not None]
+        print(f"--require-march: {len(covered)}/{len(palms_all)} palms have {march} coverage")
+        if not covered:
+            raise SystemExit(f"no palm is covered by {march} — drop --require-march or check --march-date")
+        candidates = palms_all.iloc[covered].reset_index(drop=True)
+    pick = rng.permutation(len(candidates))[:args.n_palms if args.mode == "panels" else len(candidates)]
+    palms = [candidates.iloc[i] for i in pick]
 
     height_range = None
     if args.match_height:
