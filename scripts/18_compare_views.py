@@ -139,9 +139,18 @@ def stretch(band: np.ndarray, lo_hi=(2, 98)) -> np.ndarray:
 
 
 def build_views(crop_a: np.ndarray, crop_march: np.ndarray | None,
-                exag: float = 1.0, smooth_px: float = 2.0) -> list[tuple[str, np.ndarray, dict]]:
+                exag: float = 1.0, smooth_px: float = 2.0,
+                seasonal: bool = True) -> list[tuple[str, np.ndarray, dict]]:
     """The view stack for one location. `crop_a` is leaf-on, `crop_march` early
-    spring (may be None if that date does not cover the point)."""
+    spring (may be None if that date does not cover the point).
+
+    `seasonal` is decided once by the caller for the WHOLE figure, never per
+    row: the subplot grid is rectangular, so a row that returned fewer views
+    than the first row left blank columns, and one that returned more raised
+    IndexError. With the bellinzona flights only 8 of 96 palms have March data,
+    so ragged rows were the normal case rather than an edge case. A location
+    missing March now renders explicit NaN panels, keeping the grid aligned and
+    making the gap visible instead of silently shifting columns."""
     views: list[tuple[str, np.ndarray, dict]] = []
 
     rgb = np.dstack([stretch(crop_a[b]) for b in (RED, GREEN, BLUE)])
@@ -152,12 +161,14 @@ def build_views(crop_a: np.ndarray, crop_march: np.ndarray | None,
     cir = np.dstack([stretch(crop_a[b]) for b in (NIR, RED, GREEN)])
     views.append(("false-colour IR", cir, {}))
 
-    if crop_march is not None:
-        views.append(("NDVI March", crop_march[NDVI], dict(cmap="RdYlGn", vmin=-0.2, vmax=0.9)))
-    views.append(("NDVI Aug", crop_a[NDVI], dict(cmap="RdYlGn", vmin=-0.2, vmax=0.9)))
-    if crop_march is not None:
-        views.append(("NDVI drop (Aug-Mar)", crop_a[NDVI] - crop_march[NDVI],
-                      dict(cmap="coolwarm", vmin=-0.4, vmax=0.4)))
+    blank = np.full_like(crop_a[NDVI], np.nan, dtype=float)
+    if seasonal:
+        march_ndvi = crop_march[NDVI] if crop_march is not None else blank
+        views.append(("NDVI March", march_ndvi, dict(cmap="RdYlGn", vmin=-0.2, vmax=0.9)))
+    views.append(("NDVI leaf-on", crop_a[NDVI], dict(cmap="RdYlGn", vmin=-0.2, vmax=0.9)))
+    if seasonal:
+        drop = (crop_a[NDVI] - crop_march[NDVI]) if crop_march is not None else blank
+        views.append(("NDVI drop (leaf-on - Mar)", drop, dict(cmap="coolwarm", vmin=-0.4, vmax=0.4)))
 
     from matplotlib.colors import LightSource
     from scipy import ndimage
@@ -226,13 +237,17 @@ def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
     if blind:
         np.random.default_rng(seed).shuffle(rows)
 
-    built, dropped = [], {"PALM": 0, "control": 0}
+    seasonal = march != leafon
+    built, dropped, no_march = [], {"PALM": 0, "control": 0}, 0
     for pt, label in rows:
         ca = tiles.crop(pt, leafon, half_px)
         if ca is None:
             dropped[label] += 1
             continue
-        built.append((build_views(ca, tiles.crop(pt, march, half_px), exag, smooth_px), label, pt))
+        cm = tiles.crop(pt, march, half_px) if seasonal else None
+        if seasonal and cm is None:
+            no_march += 1
+        built.append((build_views(ca, cm, exag, smooth_px, seasonal), label, pt))
     if not built:
         raise SystemExit("no location had a usable crop — check --tile-dirs and --crop-m")
 
@@ -246,6 +261,9 @@ def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
         raise SystemExit("no PALM had a usable crop — the points may be outside these tile dirs")
     if dropped["PALM"]:
         print("       raise --n-palms to compensate, or widen --tile-dirs")
+    if no_march:
+        print(f"       {no_march}/{len(built)} location(s) have no {march} data — their seasonal "
+              f"panels are blank (white). Drop the early date from --tile-dirs to remove those columns.")
 
     ncol = len(built[0][0])
     fig, axes = plt.subplots(len(built), ncol, figsize=(2.5 * ncol, 2.6 * len(built)), squeeze=False)
@@ -263,8 +281,8 @@ def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
                               fontsize=9, rotation=0, ha="right", va="center")
 
     fig.suptitle("target is the CENTRE of each crop" + ("  —  BLIND: identify the palms, key in the .txt"
-                 if blind else ""), fontsize=12)
-    fig.tight_layout()
+                 if blind else ""), fontsize=12, y=1.0)
+    fig.tight_layout(rect=(0, 0, 1, 0.97 if len(built) < 4 else 0.99))
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=115, bbox_inches="tight")
     plt.close(fig)
