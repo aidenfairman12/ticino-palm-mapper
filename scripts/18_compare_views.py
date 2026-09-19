@@ -267,9 +267,33 @@ def sample_canopy_controls(tiles: TileSet, date: str, palms: gpd.GeoSeries,
     return out
 
 
+def upsample_nearest(arr: np.ndarray | None, k: int) -> np.ndarray | None:
+    """Repeat every pixel into a k x k block along the first two (spatial) axes.
+
+    Deliberately axes 0/1, not the last two: this is called on both raw
+    channels-FIRST crops (C, H, W) and rendered channels-LAST view images
+    (H, W) or (H, W, 3) — using the last two axes would repeat the 3-channel
+    RGB axis instead of the spatial one and corrupt the colour image.
+
+    The source is 10 cm/px, so a 12 m crop is a REAL 120x120 pixels — there
+    is no higher resolution to recover, only a clearer way to show what is
+    there. Matplotlib's own imshow resampling from a 120 px array up to a
+    ~290 px panel (the pre-fix default) is a non-integer ~2.4x scale, which
+    produces a muddy blend of neighbouring source pixels rather than either
+    a sharp photo or clearly separated blocks — visually "blurry" either
+    way. Repeating each real pixel into an exact k x k block first, THEN
+    letting matplotlib display that, means every boundary in the figure is
+    a boundary that was actually in the data, just made large enough to see.
+    """
+    if arr is None or k <= 1:
+        return arr
+    return np.repeat(np.repeat(arr, k, axis=0), k, axis=1)
+
+
 def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
                march: str, leafon: str, half_px: int, blind: bool,
-               out: Path, seed: int, exag: float = 1.0, smooth_px: float = 2.0) -> None:
+               out: Path, seed: int, exag: float = 1.0, smooth_px: float = 2.0,
+               zoom: int = 4, dpi: int = 150) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -288,7 +312,18 @@ def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
         cm = tiles.crop(pt, march, half_px) if seasonal else None
         if seasonal and cm is None:
             no_march += 1
-        built.append((build_views(ca, cm, exag, smooth_px, seasonal), label, pt))
+        # Compute every view at TRUE resolution first — hillshade's gradient
+        # math assumes 10 cm between array cells (dx=dy=RES_M in build_views),
+        # and the noise-suppression blur radius is calibrated in real pixels.
+        # Upsampling the raw bands first would silently break both: a
+        # gradient computed across a repeated-value block reads as zero
+        # slope, and a blur radius that should span 20 cm would instead span
+        # 20 cm / zoom. Only the FINISHED images get blown up, purely for
+        # display — that changes how big a real pixel looks, never what it
+        # says.
+        views = [(name, upsample_nearest(img, zoom), kw)
+                for name, img, kw in build_views(ca, cm, exag, smooth_px, seasonal)]
+        built.append((views, label, pt))
     if not built:
         raise SystemExit("no location had a usable crop — check --tile-dirs and --crop-m")
 
@@ -307,7 +342,19 @@ def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
               f"panels are blank (white). Drop the early date from --tile-dirs to remove those columns.")
 
     ncol = len(built[0][0])
-    fig, axes = plt.subplots(len(built), ncol, figsize=(2.5 * ncol, 2.6 * len(built)), squeeze=False)
+    # Size the panel in inches so the upsampled array is displayed at roughly
+    # 1 array-pixel : 1 rendered pixel (side_px / dpi) rather than matplotlib
+    # silently resampling again on the way to the PNG. Clamped so a large
+    # --n-palms/--n-controls run doesn't produce an unopenable canvas; if it
+    # hits the clamp the print below says so rather than leaving it a mystery.
+    side_px = 2 * half_px * zoom
+    panel_in = min(max(side_px / dpi, 2.0), 6.0)
+    fig, axes = plt.subplots(len(built), ncol, figsize=(panel_in * ncol, panel_in * 1.04 * len(built)),
+                             squeeze=False, dpi=dpi)
+    if panel_in >= 6.0:
+        print(f"[note] panel size clamped to {panel_in:.1f}in — with {len(built)} rows this PNG will "
+              f"still be large. Lower --zoom or split the run across fewer --n-palms/--n-controls "
+              f"if it is unwieldy to open.")
     for i, (views, label, pt) in enumerate(built):
         for j, (name, img, kw) in enumerate(views):
             ax = axes[i][j]
@@ -325,7 +372,7 @@ def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
                  if blind else ""), fontsize=12, y=1.0)
     fig.tight_layout(rect=(0, 0, 1, 0.97 if len(built) < 4 else 0.99))
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=115, bbox_inches="tight")
+    fig.savefig(out, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
     print(f"wrote {out}  ({len(built)} locations x {ncol} views)")
 
@@ -419,6 +466,12 @@ def parse_args() -> argparse.Namespace:
                         "footprint and rendering blank NDVI-March/drop columns for most of them.")
     p.add_argument("--n-controls", type=int, default=12)
     p.add_argument("--crop-m", type=float, default=12.0, help="Crop side length in metres.")
+    p.add_argument("--zoom", type=int, default=4,
+                   help="Nearest-neighbour pixel-repeat factor before display (panels mode). The "
+                        "source is 10 cm/px, so this makes real pixels bigger and sharper, not "
+                        "higher-resolution — there is no finer detail to recover. Raise if crops "
+                        "still look muddy; each step is an exact 2x2 (etc.) block, never a blend.")
+    p.add_argument("--dpi", type=int, default=150, help="Output PNG resolution (panels mode).")
     p.add_argument("--canopy-min-m", type=float, default=1.0,
                    help="Minimum CHM for a control — keeps controls on woody vegetation, not lawn.")
     p.add_argument("--match-height", action="store_true",
@@ -518,7 +571,7 @@ def main() -> None:
     if args.mode == "panels":
         run_panels(tiles, palms, controls, march, leafon,
                    max(4, round(args.crop_m / RES_M / 2)), args.blind, args.out, args.seed,
-                   args.hillshade_exag, args.hillshade_smooth_px)
+                   args.hillshade_exag, args.hillshade_smooth_px, args.zoom, args.dpi)
     else:
         run_ndvi(tiles, palms, controls, march, leafon, args.out)
 
