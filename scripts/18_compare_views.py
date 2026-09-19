@@ -53,6 +53,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import rasterio
 from rasterio.transform import rowcol
 from shapely.geometry import Point, box
@@ -381,6 +382,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--tile-dirs", type=Path, nargs="+", required=True,
                    help="One per date; the date is read from each directory name.")
     p.add_argument("--points", type=Path, nargs="+", required=True, help="Confirmed-palm GeoJSONs.")
+    p.add_argument("--exclude-points", type=Path, nargs="+", default=[],
+                   help="Additional GeoJSONs (e.g. scouted/unreviewed candidates) to keep --min-dist-m "
+                        "away from when sampling controls, WITHOUT treating them as confirmed positives. "
+                        "--min-dist-m only guarantees a control isn't one of --points; it says nothing "
+                        "about the much larger set of real, unconfirmed palms that were never labeled, "
+                        "and a control could easily be one. This narrows that gap for locations you "
+                        "already have some suspicion about, but does not close it — points-only data "
+                        "cannot fully rule out an unlabeled palm landing in the control set.")
     p.add_argument("--march-date", default=None, help="Default: earliest date found.")
     p.add_argument("--leafon-date", default=None, help="Default: latest date found.")
     p.add_argument("--n-palms", type=int, default=12)
@@ -427,6 +436,15 @@ def main() -> None:
     ).drop_duplicates().reset_index(drop=True)
     print(f"{len(palms_all)} unique confirmed palms loaded")
 
+    exclude_all = palms_all
+    if args.exclude_points:
+        ex_frames = [gpd.read_file(p).to_crs("EPSG:2056") for p in args.exclude_points]
+        extra = gpd.GeoSeries([g for f in ex_frames for g in f.geometry], crs="EPSG:2056")
+        exclude_all = gpd.GeoSeries(
+            pd.concat([palms_all, extra], ignore_index=True)
+        ).drop_duplicates().reset_index(drop=True)
+        print(f"+{len(extra)} exclusion-only points ({len(exclude_all)} total kept clear of controls)")
+
     rng = np.random.default_rng(args.seed)
     candidates = palms_all
     if args.mode == "panels" and args.require_march and len(tiles.dates) > 1:
@@ -463,7 +481,7 @@ def main() -> None:
               f"— controls restricted to this range")
 
     controls = sample_canopy_controls(
-        tiles, leafon, palms_all,
+        tiles, leafon, exclude_all,
         args.n_controls if args.mode == "panels" else max(args.n_controls, 200),
         args.min_dist_m, args.canopy_min_m, args.seed, height_range)
     print(f"using {len(palms)} palms and {len(controls)} canopy controls")
