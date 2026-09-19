@@ -185,44 +185,65 @@ def build_views(crop_a: np.ndarray, crop_march: np.ndarray | None,
 
 def sample_canopy_controls(tiles: TileSet, date: str, palms: gpd.GeoSeries,
                            n: int, min_dist_m: float, canopy_min_m: float,
-                           seed: int, height_range: tuple[float, float] | None = None) -> list[Point]:
+                           seed: int, height_range: tuple[float, float] | None = None,
+                           pts_per_tile: int = 400) -> list[Point]:
     """Points on canopy (CHM >= canopy_min_m) at least min_dist_m from any palm.
 
     Deliberately NOT uniform over the tile: the model already separates palm
     from road and roof, and the discrimination it fails at — and that a human
     must supply — is palm vs other tree.
+
+    Draws `pts_per_tile` CANDIDATE points from each tile before moving to the
+    next, rather than one point per random tile pick. The naive version reads
+    or cache-misses a full tile (~115 ms measured locally, worse on a network
+    filesystem) for every SINGLE candidate point, most of which get rejected
+    by canopy_min_m — at bellinzona's ~5100 tiles per date with a small LRU
+    cache, that is effectively one tile read per rejected point, which can run
+    to many minutes or longer depending on canopy coverage. Amortizing many
+    candidates over one tile load turns "n rejections" into "one tile read per
+    ~pts_per_tile candidates", independent of how sparse canopy is.
     """
     rng = np.random.default_rng(seed)
     entries = tiles.by_date.get(date, [])
     if not entries:
         raise SystemExit(f"no tiles for date {date}")
+    tile_order = rng.permutation(len(entries))
     out: list[Point] = []
-    for _ in range(n * 400):
+    tiles_visited = 0
+    for ti in tile_order:
         if len(out) >= n:
             break
-        path, bounds = entries[rng.integers(len(entries))]
-        lo_x, lo_y, hi_x, hi_y = bounds.bounds
-        pt = Point(rng.uniform(lo_x, hi_x), rng.uniform(lo_y, hi_y))
-        if len(palms) and palms.distance(pt).min() < min_dist_m:
-            continue
+        tiles_visited += 1
+        path, bounds = entries[ti]
         arr, transform = tiles.load(path)
-        r, c = rowcol(transform, pt.x, pt.y)
-        if not (0 <= r < arr.shape[1] and 0 <= c < arr.shape[2]):
-            continue
-        if (arr[:, r, c] == 0).all() or arr[CHM, r, c] < canopy_min_m:
-            continue
-        # Height matching. Without it a flat --canopy-min-m floor manufactures
-        # a CHM separation whenever the palms sit below it: measured on
-        # bellinzona the confirmed palms are ~1.4 m against 14 m canopy
-        # controls, an AUC of 0.98 that says nothing except that the sampler
-        # was told to pick tall things. Negatives drawn that way would teach
-        # "short = palm", the mirror of the vegetation leak being fixed.
-        if height_range is not None and not (height_range[0] <= arr[CHM, r, c] <= height_range[1]):
-            continue
-        out.append(pt)
+        lo_x, lo_y, hi_x, hi_y = bounds.bounds
+        for _ in range(pts_per_tile):
+            if len(out) >= n:
+                break
+            pt = Point(rng.uniform(lo_x, hi_x), rng.uniform(lo_y, hi_y))
+            if len(palms) and palms.distance(pt).min() < min_dist_m:
+                continue
+            r, c = rowcol(transform, pt.x, pt.y)
+            if not (0 <= r < arr.shape[1] and 0 <= c < arr.shape[2]):
+                continue
+            if (arr[:, r, c] == 0).all() or arr[CHM, r, c] < canopy_min_m:
+                continue
+            # Height matching. Without it a flat --canopy-min-m floor
+            # manufactures a CHM separation whenever the palms sit below it:
+            # measured on bellinzona the confirmed palms are ~1.4 m against
+            # 14 m canopy controls, an AUC of 0.98 that says nothing except
+            # that the sampler was told to pick tall things. Negatives drawn
+            # that way would teach "short = palm", the mirror of the
+            # tall-vegetation leak this whole investigation is about.
+            if height_range is not None and not (height_range[0] <= arr[CHM, r, c] <= height_range[1]):
+                continue
+            out.append(pt)
+        if tiles_visited % 200 == 0:
+            print(f"  ...scanned {tiles_visited}/{len(entries)} tiles, {len(out)}/{n} controls found")
+    print(f"  controls: found {len(out)}/{n} after scanning {tiles_visited}/{len(entries)} tiles")
     if len(out) < n:
-        print(f"[warn] only found {len(out)}/{n} canopy controls — "
-              f"try lowering --canopy-min-m (currently {canopy_min_m} m)")
+        print(f"[warn] only found {len(out)}/{n} canopy controls after visiting every tile — "
+              f"lower --canopy-min-m (currently {canopy_min_m} m) or --min-dist-m")
     return out
 
 
@@ -390,9 +411,10 @@ def main() -> None:
         raise SystemExit("no *_nirchm.tif found under --tile-dirs")
     march = args.march_date or tiles.dates[0]
     leafon = args.leafon_date or tiles.dates[-1]
-    print(f"dates found: {tiles.dates}   using march={march}, leaf-on={leafon}")
-    if march == leafon:
-        print("[warn] march and leaf-on are the same date — the seasonal views will be empty")
+    if len(tiles.dates) == 1:
+        print(f"dates found: {tiles.dates}   single date — seasonal columns/comparison skipped")
+    else:
+        print(f"dates found: {tiles.dates}   using march={march}, leaf-on={leafon}")
 
     frames = [gpd.read_file(p).to_crs("EPSG:2056") for p in args.points]
     palms_all = gpd.GeoSeries(
