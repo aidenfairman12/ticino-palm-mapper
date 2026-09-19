@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections import OrderedDict
 from pathlib import Path
 
 import geopandas as gpd
@@ -186,17 +187,38 @@ def extract_features_from_array(arr: np.ndarray, transform, point: shapely.geome
     return feats
 
 
-def extract_features(tile_path: Path, point: shapely.geometry.Point, radii_m: list[float]) -> dict:
-    arr, transform, _ = load_tile(tile_path)
+def extract_features(tile_path: Path, point: shapely.geometry.Point, radii_m: list[float],
+                     _cache: OrderedDict | None = None, _max_cached: int = 150) -> dict:
+    """Same as ever when `_cache` is None (every caller before this change).
+
+    build_rows now passes a shared cache across an entire run: at this
+    project's scale a tile is one 6-channel 1024x1024 array (~25 MB), and
+    with hard-negative harvesting now producing up to --per-tile-cap points
+    per tile (see scripts/19), the SAME tile can be the covering tile for
+    many rows in a row — build_rows previously re-read it from disk via
+    load_tile every single time, with zero reuse. Bounded LRU, same pattern
+    and cap as score_candidates_classical.py's tile cache.
+    """
+    if _cache is None:
+        arr, transform, _ = load_tile(tile_path)
+    else:
+        if tile_path in _cache:
+            _cache.move_to_end(tile_path)
+        else:
+            _cache[tile_path] = load_tile(tile_path)
+            if len(_cache) > _max_cached:
+                _cache.popitem(last=False)
+        arr, transform, _ = _cache[tile_path]
     return extract_features_from_array(arr, transform, point, radii_m)
 
 
 def build_rows(points: gpd.GeoSeries, label: float, tile_boxes, radii_m: list[float]) -> list[dict]:
     rows = []
+    _cache: OrderedDict = OrderedDict()
     for point_id, point in enumerate(points):
         covering = find_covering_tiles(point, tile_boxes)
         for tile_path in covering:
-            feats = extract_features(tile_path, point, radii_m)
+            feats = extract_features(tile_path, point, radii_m, _cache)
             feats.update(
                 point_id=f"{'pos' if label else 'neg'}_{point_id}",
                 label=label,
