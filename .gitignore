@@ -33,6 +33,7 @@ data/interim/labels/*
 !data/interim/labels/*_hand_verified.csv
 !data/interim/labels/*_confirmed_palms.geojson
 !data/interim/labels/*_hard_negatives.geojson
+!data/interim/labels/harvested_deciduous_negatives.geojson
 # model checkpoints
 *.pt
 *.ckpt
