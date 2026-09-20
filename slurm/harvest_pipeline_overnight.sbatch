@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
-#SBATCH --time=03:00:00
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/harvest_pipeline/palm-harvest-pipeline-%j.out
 #SBATCH --error=logs/harvest_pipeline/palm-harvest-pipeline-%j.err
 
