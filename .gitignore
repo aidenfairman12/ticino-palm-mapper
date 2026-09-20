@@ -55,3 +55,12 @@ logs/
 # VSCode remote tunnel launcher/log — machine-specific, not part of the codebase
 code-tunnel.sbatch
 tunnel.log
+
+# classical-pipeline regenerable outputs — feature tables (scripts/15) and
+# dense per-pixel score rasters (dense_classical.py). Regenerate from the
+# tracked label data + tile dirs; one classical_features_* variant already
+# got close to GitHub's 100MB file size limit.
+classical_features*.csv
+dense_scores*/
+output_dir/
+sharpness_examples/
