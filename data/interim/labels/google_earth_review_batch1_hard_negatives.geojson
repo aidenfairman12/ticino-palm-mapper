@@ -10,13 +10,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_1",
+        "id": "gearth_batch1_negative_1",
         "x": 2718971.3,
         "y": 1112832.03,
         "lon": 8.978774350660936,
         "lat": 46.15646250181302,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -29,13 +29,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_2",
+        "id": "gearth_batch1_negative_2",
         "x": 2719002.73,
         "y": 1115643.05,
         "lon": 8.979895897212767,
         "lat": 46.18173889861886,
         "note": "",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -48,13 +48,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_3",
+        "id": "gearth_batch1_negative_3",
         "x": 2719138.9,
         "y": 1115759.65,
         "lon": 8.981688816556597,
         "lat": 46.18276344572472,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -67,13 +67,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_4",
+        "id": "gearth_batch1_negative_4",
         "x": 2719240.9,
         "y": 1115737.65,
         "lon": 8.983003950099205,
         "lat": 46.18254758074366,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -86,13 +86,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_5",
+        "id": "gearth_batch1_negative_5",
         "x": 2718378.38,
         "y": 1112787.84,
         "lon": 8.971089459891532,
         "lat": 46.15616954092293,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -105,13 +105,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_6",
+        "id": "gearth_batch1_negative_6",
         "x": 2718363.44,
         "y": 1112813.19,
         "lon": 8.970902524675905,
         "lat": 46.15640012417914,
         "note": "non-palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -124,13 +124,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_7",
+        "id": "gearth_batch1_negative_7",
         "x": 2719188.57,
         "y": 1113136.11,
         "lon": 8.981663600375294,
         "lat": 46.15915899549273,
         "note": "non-palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -143,13 +143,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_8",
+        "id": "gearth_batch1_negative_8",
         "x": 2719123.58,
         "y": 1113045.38,
         "lon": 8.980799370370713,
         "lat": 46.15835440811084,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -162,13 +162,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_9",
+        "id": "gearth_batch1_negative_9",
         "x": 2719254.25,
         "y": 1113047.35,
         "lon": 8.98249114431267,
         "lat": 46.15834902826699,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -181,13 +181,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_10",
+        "id": "gearth_batch1_negative_10",
         "x": 2719123.86,
         "y": 1112998.26,
         "lon": 8.98079110758222,
         "lat": 46.15793061041929,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -200,13 +200,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_11",
+        "id": "gearth_batch1_negative_11",
         "x": 2719185.26,
         "y": 1113217.55,
         "lon": 8.981641514598026,
         "lat": 46.1598919944627,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -219,13 +219,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_12",
+        "id": "gearth_batch1_negative_12",
         "x": 2718772.14,
         "y": 1112795.51,
         "lon": 8.976187448721475,
         "lat": 46.15616921444045,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -238,13 +238,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_13",
+        "id": "gearth_batch1_negative_13",
         "x": 2719261.58,
         "y": 1115721.13,
         "lon": 8.983267417352598,
         "lat": 46.18239534237229,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -257,13 +257,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_14",
+        "id": "gearth_batch1_negative_14",
         "x": 2719100.56,
         "y": 1115724.6,
         "lon": 8.981183357015015,
         "lat": 46.18245499607039,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -276,13 +276,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_15",
+        "id": "gearth_batch1_negative_15",
         "x": 2719220.25,
         "y": 1115782.89,
         "lon": 8.982748020896075,
         "lat": 46.18295811754258,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -295,13 +295,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_16",
+        "id": "gearth_batch1_negative_16",
         "x": 2719108.95,
         "y": 1115752.94,
         "lon": 8.981299238369168,
         "lat": 46.18270840133196,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -314,13 +314,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_17",
+        "id": "gearth_batch1_negative_17",
         "x": 2719112.28,
         "y": 1115756.49,
         "lon": 8.981343236378423,
         "lat": 46.18273979251261,
         "note": "non palm tree",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -333,13 +333,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_18",
+        "id": "gearth_batch1_negative_18",
         "x": 2719015.02,
         "y": 1115625.0,
         "lon": 8.980050496470461,
         "lat": 46.1815743605292,
         "note": "",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -352,13 +352,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_19",
+        "id": "gearth_batch1_negative_19",
         "x": 2718954.9,
         "y": 1115611.0,
         "lon": 8.979268513349965,
         "lat": 46.18145908240885,
         "note": "",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",
@@ -371,13 +371,13 @@
     {
       "type": "Feature",
       "properties": {
-        "id": "gearth_20260921_negative_20",
+        "id": "gearth_batch1_negative_20",
         "x": 2718904.38,
         "y": 1115384.96,
         "lon": 8.978556892592204,
         "lat": 46.17943499125223,
         "note": "",
-        "source": "google_earth_visual_review_20260921"
+        "source": "google_earth_visual_review_batch1"
       },
       "geometry": {
         "type": "Point",

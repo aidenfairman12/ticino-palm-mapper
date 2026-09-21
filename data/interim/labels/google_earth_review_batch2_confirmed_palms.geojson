@@ -1,0 +1,543 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:EPSG::2056"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_1",
+        "x": 2719344.32,
+        "y": 1115862.71,
+        "lon": 8.98437491753566,
+        "lat": 46.18365404761143,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719344.32,
+          1115862.71
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_2",
+        "x": 2719130.74,
+        "y": 1115723.48,
+        "lon": 8.981573926843554,
+        "lat": 46.18243961620053,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719130.74,
+          1115723.48
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_3",
+        "x": 2719128.67,
+        "y": 1115721.2,
+        "lon": 8.981546561570186,
+        "lat": 46.18241946277303,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719128.67,
+          1115721.2
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_4",
+        "x": 2719195.37,
+        "y": 1115530.41,
+        "lon": 8.98236159095083,
+        "lat": 46.18069174509675,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719195.37,
+          1115530.41
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_5",
+        "x": 2719410.44,
+        "y": 1115856.42,
+        "lon": 8.985229526476456,
+        "lat": 46.18358574860736,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719410.44,
+          1115856.42
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_6",
+        "x": 2719368.84,
+        "y": 1115855.2,
+        "lon": 8.984690456384289,
+        "lat": 46.18358212662727,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719368.84,
+          1115855.2
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_7",
+        "x": 2719143.96,
+        "y": 1112890.33,
+        "lon": 8.981023755716958,
+        "lat": 46.15695632593776,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719143.96,
+          1112890.33
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_8",
+        "x": 2719039.93,
+        "y": 1112861.89,
+        "lon": 8.979670157818148,
+        "lat": 46.15671898575954,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719039.93,
+          1112861.89
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_9",
+        "x": 2719139.22,
+        "y": 1112892.88,
+        "lon": 8.98096304720334,
+        "lat": 46.1569800974405,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719139.22,
+          1112892.88
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_10",
+        "x": 2718769.56,
+        "y": 1112948.58,
+        "lon": 8.976192976607106,
+        "lat": 46.15754632544851,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2718769.56,
+          1112948.58
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_11",
+        "x": 2718767.3,
+        "y": 1112957.47,
+        "lon": 8.976165893524469,
+        "lat": 46.15762667299978,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2718767.3,
+          1112957.47
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_12",
+        "x": 2718842.48,
+        "y": 1113005.1,
+        "lon": 8.977151068114715,
+        "lat": 46.15804184312179,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2718842.48,
+          1113005.1
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_13",
+        "x": 2719362.77,
+        "y": 1115923.3,
+        "lon": 8.984629236940256,
+        "lat": 46.18419567249683,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719362.77,
+          1115923.3
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_14",
+        "x": 2718651.57,
+        "y": 1113192.7,
+        "lon": 8.97472772449682,
+        "lat": 46.15976271475045,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2718651.57,
+          1113192.7
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_15",
+        "x": 2718650.0,
+        "y": 1113190.52,
+        "lon": 8.974706847441096,
+        "lat": 46.15974340160898,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2718650.0,
+          1113190.52
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_16",
+        "x": 2719429.37,
+        "y": 1115821.96,
+        "lon": 8.985465771414587,
+        "lat": 46.18327244968248,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719429.37,
+          1115821.96
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_17",
+        "x": 2719369.68,
+        "y": 1115857.48,
+        "lon": 8.984701941091636,
+        "lat": 46.18360250930618,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719369.68,
+          1115857.48
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_18",
+        "x": 2719932.22,
+        "y": 1115531.88,
+        "lon": 8.991902556768371,
+        "lat": 46.18057410402975,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719932.22,
+          1115531.88
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_19",
+        "x": 2719849.67,
+        "y": 1115587.63,
+        "lon": 8.990847908985227,
+        "lat": 46.18109021509861,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719849.67,
+          1115587.63
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_20",
+        "x": 2719368.64,
+        "y": 1115856.55,
+        "lon": 8.984688250253491,
+        "lat": 46.18359428112282,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719368.64,
+          1115856.55
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_21",
+        "x": 2718322.72,
+        "y": 1114557.99,
+        "lon": 8.970816704268245,
+        "lat": 46.17209977637343,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2718322.72,
+          1114557.99
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_22",
+        "x": 2719487.32,
+        "y": 1115739.03,
+        "lon": 8.986194899162186,
+        "lat": 46.18251628402295,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719487.32,
+          1115739.03
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_23",
+        "x": 2718348.05,
+        "y": 1114566.36,
+        "lon": 8.971146663521147,
+        "lat": 46.1721706349412,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2718348.05,
+          1114566.36
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_24",
+        "x": 2719485.91,
+        "y": 1115727.57,
+        "lon": 8.986173723445486,
+        "lat": 46.18241345578551,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719485.91,
+          1115727.57
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_25",
+        "x": 2719816.97,
+        "y": 1115597.02,
+        "lon": 8.990426924671937,
+        "lat": 46.18118047021123,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2719816.97,
+          1115597.02
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_26",
+        "x": 2718528.35,
+        "y": 1113778.46,
+        "lon": 8.973281212599758,
+        "lat": 46.16505264581043,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2718528.35,
+          1113778.46
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_27",
+        "x": 2717354.6,
+        "y": 1114160.99,
+        "lon": 8.95818400126084,
+        "lat": 46.16869864087616,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2717354.6,
+          1114160.99
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "gearth_batch2_palm_28",
+        "x": 2717327.98,
+        "y": 1114182.66,
+        "lon": 8.957844742589645,
+        "lat": 46.16889817173984,
+        "note": "",
+        "source": "google_earth_visual_review_batch2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2717327.98,
+          1114182.66
+        ]
+      }
+    }
+  ]
+}

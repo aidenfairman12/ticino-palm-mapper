@@ -1,26 +1,29 @@
-"""One-off import of the user's first Google Earth visual-review pass over
-the native-10cm footprint KML (scripts/24's output). The user added two
-folders of new placemarks in Earth ('palms', 'negatives') and deleted two
-existing confirmed-palm placemarks they decided were wrong on closer look,
-then re-exported the whole project as KML.
+"""Import a Google Earth visual-review pass over the native-10cm footprint
+KML (scripts/24's output). The user adds placemarks in Earth under 'palms'
+and 'negatives' folders (and may delete some of the original root-level
+confirmed-palm placemarks they decide are wrong on closer look), then
+re-exports the whole project as KML. This is re-run every time the user does
+another pass and re-exports.
 
-Splits that single edited KML into:
-  - google_earth_review_20260921_confirmed_palms.geojson   (new 'palms' folder)
-  - google_earth_review_20260921_vegetation_negatives.geojson (new 'negatives' folder)
-  - a report of which existing confirmed points are missing (present in the
-    original 135-point export but absent from the root-level points in the
-    edited KML), for manual removal from whichever source file they came from
+Root-level placemarks (no folder) are always the ORIGINAL confirmed-palm
+points scripts/24 wrote in — this only works because the user doesn't move
+anything out of the root level into a folder; if they had, this diffing
+approach would misattribute it.
 
-Root-level placemarks (no folder) are the ORIGINAL confirmed-palm points
-scripts/24 wrote in; anything inside 'palms'/'negatives' folders is new. This
-only works because the user didn't move anything out of the root level into
-a folder — if they had, this diffing approach would misattribute it.
+Handles repeat passes over the SAME project (the KML keeps growing as the
+user adds more): loads every already-imported batch's points
+(google_earth_review_batch*_confirmed_palms.geojson /
+..._hard_negatives.geojson) and skips anything within ~1m of a point already
+imported, so re-running after another editing pass only writes the NEW
+points into a new, separately-numbered batch file — it never re-imports or
+duplicates a prior batch.
 
-Usage: python3 scripts/25_import_earth_review_batch.py --kml <path>
+Usage: python3 scripts/25_import_earth_review_batch.py --kml <path> --batch 2
 """
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -31,6 +34,7 @@ NS = {"kml": "http://www.opengis.net/kml/2.2"}
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LABELS_DIR = REPO_ROOT / "data" / "interim" / "labels"
 CONFIRMED_FILES = ["lugano_MASTER_confirmed_palms.geojson", "active_learning_confirmed_palms.geojson"]
+DUP_TOLERANCE_DEG = 1e-5  # ~1m
 
 
 def walk_points(el, path, out):
@@ -57,7 +61,7 @@ def walk_points(el, path, out):
             walk_points(child, path, out)
 
 
-def make_geojson(points: list[dict], to_lv95, label: str) -> dict:
+def make_geojson(points: list[dict], to_lv95, label: str, batch: int) -> dict:
     features = []
     for i, p in enumerate(points):
         x, y = to_lv95.transform(p["lon"], p["lat"])
@@ -65,11 +69,11 @@ def make_geojson(points: list[dict], to_lv95, label: str) -> dict:
         features.append({
             "type": "Feature",
             "properties": {
-                "id": f"gearth_20260921_{label}_{i+1}",
+                "id": f"gearth_batch{batch}_{label}_{i+1}",
                 "x": round(x, 2), "y": round(y, 2),
                 "lon": p["lon"], "lat": p["lat"],
                 "note": note,
-                "source": "google_earth_visual_review_20260921",
+                "source": f"google_earth_visual_review_batch{batch}",
             },
             "geometry": {"type": "Point", "coordinates": [round(x, 2), round(y, 2)]},
         })
@@ -80,9 +84,34 @@ def make_geojson(points: list[dict], to_lv95, label: str) -> dict:
     }
 
 
+def load_previously_imported_lonlat(pattern: str) -> list[tuple[float, float]]:
+    pts = []
+    for fname in glob.glob(str(LABELS_DIR / pattern)):
+        data = json.loads(Path(fname).read_text())
+        for feat in data["features"]:
+            props = feat["properties"]
+            if "lon" in props and "lat" in props:
+                pts.append((props["lon"], props["lat"]))
+    return pts
+
+
+def dedup_against(points: list[dict], already: list[tuple[float, float]]) -> list[dict]:
+    if not already:
+        return points
+    out = []
+    for p in points:
+        d = min(((p["lon"] - lo) ** 2 + (p["lat"] - la) ** 2) ** 0.5 for lo, la in already)
+        if d > DUP_TOLERANCE_DEG:
+            out.append(p)
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--kml", type=Path, required=True)
+    ap.add_argument("--batch", type=int, required=True,
+                     help="Batch number for this pass, e.g. 2 for the second editing session. "
+                          "Must not reuse a number already written to disk.")
     args = ap.parse_args()
 
     tree = ET.parse(args.kml)
@@ -90,10 +119,17 @@ def main() -> None:
     walk_points(tree.getroot(), [], all_points)
 
     root_points = [p for p in all_points if p["folder"] is None]
-    palms = [p for p in all_points if p["folder"] == "palms"]
-    negatives = [p for p in all_points if p["folder"] == "negatives"]
+    palms_raw = [p for p in all_points if p["folder"] == "palms"]
+    negatives_raw = [p for p in all_points if p["folder"] == "negatives"]
     print(f"root-level (original) points: {len(root_points)}")
-    print(f"new palms: {len(palms)}, new negatives: {len(negatives)}")
+    print(f"palms in KML: {len(palms_raw)}, negatives in KML: {len(negatives_raw)}")
+
+    already_palms = load_previously_imported_lonlat("google_earth_review_batch*_confirmed_palms.geojson")
+    already_negs = load_previously_imported_lonlat("google_earth_review_batch*_hard_negatives.geojson")
+    palms = dedup_against(palms_raw, already_palms)
+    negatives = dedup_against(negatives_raw, already_negs)
+    print(f"already imported in prior batches: {len(already_palms)} palms, {len(already_negs)} negatives")
+    print(f"NEW this batch: {len(palms)} palms, {len(negatives)} negatives")
 
     to_wgs = Transformer.from_crs("EPSG:2056", "EPSG:4326", always_xy=True)
     to_lv95 = Transformer.from_crs("EPSG:4326", "EPSG:2056", always_xy=True)
@@ -115,20 +151,42 @@ def main() -> None:
     def closest_dist(lon, lat):
         return min(((lon - p["lon"]) ** 2 + (lat - p["lat"]) ** 2) ** 0.5 for p in root_points) if root_points else 1e9
 
-    missing = [o for o in originals if closest_dist(o["lon"], o["lat"]) > 1e-5]
-    print(f"\nremoved (present originally, absent from edited root-level points): {len(missing)}")
+    missing = [o for o in originals if closest_dist(o["lon"], o["lat"]) > DUP_TOLERANCE_DEG]
+    print(f"\nremoved from the ORIGINAL confirmed set (present before scripts/24, absent from edited "
+          f"root-level points): {len(missing)}")
     for m in missing:
         print(f"  {m['file']} :: {m['pid']}  (x={m['x']}, y={m['y']})")
 
-    palms_out = LABELS_DIR / "google_earth_review_20260921_confirmed_palms.geojson"
-    neg_out = LABELS_DIR / "google_earth_review_20260921_vegetation_negatives.geojson"
-    palms_out.write_text(json.dumps(make_geojson(palms, to_lv95, "palm"), indent=2))
-    neg_out.write_text(json.dumps(make_geojson(negatives, to_lv95, "negative"), indent=2))
-    print(f"\nwrote {len(palms)} palms -> {palms_out}")
-    print(f"wrote {len(negatives)} negatives -> {neg_out}")
+    # also check whether any PREVIOUSLY-IMPORTED batch point (in the 'palms'/'negatives'
+    # folders, not root) is missing from this new export -- e.g. the user deleted one
+    # they'd added in an earlier pass.
+    def missing_from_kml(prior_lonlat, kml_folder_points, kind):
+        kml_set = kml_folder_points
+        gone = []
+        for lo, la in prior_lonlat:
+            d = min(((lo - p["lon"]) ** 2 + (la - p["lat"]) ** 2) ** 0.5 for p in kml_set) if kml_set else 1e9
+            if d > DUP_TOLERANCE_DEG:
+                gone.append((lo, la))
+        if gone:
+            print(f"\n[warn] {len(gone)} previously-imported {kind} no longer appear in this KML "
+                  f"(deleted in Earth since the last import?) -- not auto-removed, check by hand: {gone}")
+    missing_from_kml(already_palms, palms_raw, "palms")
+    missing_from_kml(already_negs, negatives_raw, "negatives")
+
+    if not palms and not negatives:
+        print("\nnothing new to write.")
+        return
+
+    palms_out = LABELS_DIR / f"google_earth_review_batch{args.batch}_confirmed_palms.geojson"
+    neg_out = LABELS_DIR / f"google_earth_review_batch{args.batch}_hard_negatives.geojson"
+    if palms_out.exists() or neg_out.exists():
+        raise SystemExit(f"batch {args.batch} output already exists -- pick an unused --batch number")
+    palms_out.write_text(json.dumps(make_geojson(palms, to_lv95, "palm", args.batch), indent=2))
+    neg_out.write_text(json.dumps(make_geojson(negatives, to_lv95, "negative", args.batch), indent=2))
+    print(f"\nwrote {len(palms)} NEW palms -> {palms_out}")
+    print(f"wrote {len(negatives)} NEW negatives -> {neg_out}")
     print("\nNOTE: the 'removed' points above were NOT auto-deleted from their source files "
-          "-- remove them by hand (or re-run with a --remove flag if you add one) after confirming "
-          "this list matches what you actually deleted in Earth.")
+          "-- remove them by hand after confirming the list matches what was actually deleted in Earth.")
 
 
 if __name__ == "__main__":
