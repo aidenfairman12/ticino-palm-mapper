@@ -373,7 +373,7 @@ def dense_spatial_features(arr: np.ndarray, radii_m: list[float]) -> dict[str, n
             
             masks = _wedge_masks(radius_px)
             ones = np.ones((H, W), dtype=np.float64)
-            wedge_means = []
+            wedge_means, wedge_valid = [], []
             for mask in masks:
                 # fftconvolve does true convolution (flips the kernel); flipping the
                 # mask first cancels that, giving correlation — matching the point
@@ -381,11 +381,27 @@ def dense_spatial_features(arr: np.ndarray, radii_m: list[float]) -> dict[str, n
                 flipped = mask[::-1, ::-1]
                 wsum = signal.fftconvolve(chm_band, flipped, mode="same")
                 wcount = signal.fftconvolve(ones, flipped, mode="same")
-                safe_count = np.where(wcount > 0.5, wcount, 1.0)
-                wedge_means.append(np.where(wcount > 0.5, wsum / safe_count, 0.0))
+                valid = wcount > 0.5  # a wedge with no in-bounds pixels here (tile corners)
+                safe_count = np.where(valid, wcount, 1.0)
+                wedge_means.append(np.where(valid, wsum / safe_count, 0.0))
+                wedge_valid.append(valid)
 
             wedge_stack = np.stack(wedge_means, axis=0)  # (8, H, W)
-            feats[f"chm_asymmetry_r{r}"] = np.var(wedge_stack, axis=0).astype(np.float32)
+            valid_stack = np.stack(wedge_valid, axis=0)  # (8, H, W) bool
+            n_valid = valid_stack.sum(axis=0)
+            enough = n_valid >= 2  # matches the point path's `len(wedge_means) < 2: return 0.0`
+            safe_n = np.where(enough, n_valid, 1)
+
+            # masked mean/variance across ONLY the valid sectors at each pixel --
+            # an invalid sector's fabricated 0.0 above must not leak into either
+            # the mean or the variance, or a fake 0.0 sitting among several-metre
+            # real heights would inflate asymmetry right at tile corners.
+            masked_vals = np.where(valid_stack, wedge_stack, 0.0)
+            valid_mean = masked_vals.sum(axis=0) / safe_n
+            sq_dev = np.where(valid_stack, (wedge_stack - valid_mean) ** 2, 0.0)
+            variance = sq_dev.sum(axis=0) / safe_n
+
+            feats[f"chm_asymmetry_r{r}"] = np.where(enough, variance, 0.0).astype(np.float32)
  
             row_idx, col_idx = np.indices((H, W))
             feats[f"chm_window_clipped_r{r}"] = (
