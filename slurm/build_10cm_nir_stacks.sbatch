@@ -27,11 +27,23 @@
 #      native-resolution-diff-then-resample method, not the old
 #      resample-then-subtract one -- this is also this fix's first real
 #      full-AOI exercise)
-#   3. 07_build_nir_stack.py, once per new date -- fuses in the paid RS
-#      delivery (already safe in git-tracked data/raw/, no upload needed)
+#   3. 07_build_nir_stack.py, once per date -- fuses in the paid RS delivery
+#      (already safe in git-tracked data/raw/, no upload needed)
+#
+# Step 3 now covers ALL FIVE dates, not just the two new ones: the fixed
+# CHM computed in step 2 is shared/identical across every date by
+# construction (07 copies the SAME chm band from 03's output into every
+# feature_stack_rs_<date> it writes), but the three ALREADY-BUILT dates
+# (20210324, 20210811, 20240821) still hold CHM from the OLD, buggy method
+# until they're re-fused against this run's corrected 03 output too --
+# otherwise the old and new dates would silently disagree on CHM for the
+# same ground, breaking the "CHM is date-invariant" property relied on
+# throughout scripts/15 and dense_classical.py. Re-running 07 for the old
+# three is cheap relative to steps 1-2 (no new fetching, just re-reading
+# already-open RS strips and the now-updated 03 tiles).
 #
 # `set -e`: each stage genuinely depends on the previous succeeding here
-# (unlike the old 07-only version, where the two dates were independent of
+# (unlike the original 07-only version, where dates were independent of
 # each other) -- no point starting 03 if 00 failed, or 07 if 03 failed.
 #
 # Confirmed ~1TB+ free needed (per configs/bellinzona_full_nir.yaml's own
@@ -51,7 +63,7 @@ python scripts/00_fetch_swissimage.py --config configs/bellinzona_full_nir.yaml
 echo "=== [2/3] 03_build_feature_stack.py (LiDAR CHM, fixed method, whole AOI) $(date) ==="
 python scripts/03_build_feature_stack.py --config configs/bellinzona_full_nir.yaml
 
-for rs_date in 20240720 20240810; do
+for rs_date in 20210324 20210811 20240821 20240720 20240810; do
     echo "=== [3/3] 07_build_nir_stack.py --rs-date $rs_date $(date) ==="
     python scripts/07_build_nir_stack.py --config configs/bellinzona_full_nir.yaml --rs-date "$rs_date"
     echo "=== done with $rs_date  $(date) ==="
