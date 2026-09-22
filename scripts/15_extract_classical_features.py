@@ -155,25 +155,27 @@ def window_helper(arr: np.ndarray, transform, point: shapely.geometry.Point, rad
     r0, r1 = max(0, row - radius_px), min(H, row + radius_px + 1)
     c0, c1 = max(0, col - radius_px), min(W, col + radius_px + 1)
     window = arr[:, r0:r1, c0:c1]
+    clipped = (r0 != row - radius_px) or (r1 != row + radius_px + 1) or \
+              (c0 != col - radius_px) or (c1 != col + radius_px + 1)
     
-    return window, row, col, r0, c0
+    return window, row, col, radius_px, r0, c0, clipped
 
 def window_stats(arr: np.ndarray, transform, point: shapely.geometry.Point, radius_m: float):
     """(point_value, mean, std, max, min) per band within radius_m of point."""
 
-    window, row, col, _, _ = window_helper(arr, transform, point, radius_m)
+    window, row, col, _, _, _, _ = window_helper(arr, transform, point, radius_m)
     point_val = arr[:, row, col]
     
     return point_val, window.mean(axis=(1, 2)), window.std(axis=(1, 2)), window.max(axis=(1, 2)), window.min(axis=(1, 2))
 
 
 def chm_window(arr: np.ndarray, transform, point: shapely.geometry.Point, radius_m: float,
-                band_names: list[str]) -> np.ndarray:
+                band_names: list[str]) -> tuple[np.ndarray, bool]:
     """2D (row, col) window of just the CHM band, for the chm_* shape
     descriptors below — unlike window_helper's (band, row, col) window
     across all bands, or window_stats' per-band scalar reductions."""
-    window, _, _, _, _ = window_helper(arr, transform, point, radius_m)
-    return window[band_names.index("chm")]
+    window, _, _, _, _, _, clipped = window_helper(arr, transform, point, radius_m)
+    return window[band_names.index("chm")], clipped
 
 
 def chm_peak_ratio(window: np.ndarray) -> float:
@@ -202,10 +204,10 @@ def chm_kurtosis(window: np.ndarray) -> float:
 
 
 def chm_local_roughness(arr, transform, point, radius_m, band_names, pad_m=RES_M) -> float:
-    pad_window, _, _, pad_r0, pad_c0 = window_helper(arr, transform, point, radius_m + pad_m)
+    pad_window, _, _, _, pad_r0, pad_c0, _ = window_helper(arr, transform, point, radius_m + pad_m)
     pad_window = pad_window[band_names.index("chm")]
 
-    tgt_window , _, _, tgt_r0, tgt_c0 = window_helper(arr, transform, point, radius_m)
+    tgt_window, _, _, _, tgt_r0, tgt_c0, _ = window_helper(arr, transform, point, radius_m)
     
     top = tgt_r0 - pad_r0
     left = tgt_c0 - pad_c0
@@ -262,12 +264,14 @@ def extract_features_from_array(arr: np.ndarray, transform, point: shapely.geome
             feats[f"{name}_min_r{r}"] = float(mn[i])
             
         if "chm" in band_names:
-            cw = chm_window(arr, transform, point, r, band_names)
+            cw, clipped = chm_window(arr, transform, point, r, band_names)
             feats[f"chm_peak_ratio_r{r}"] = chm_peak_ratio(cw)
             feats[f"chm_skew_r{r}"] = chm_skewness(cw)
             feats[f"chm_kurtosis_r{r}"] = chm_kurtosis(cw)
             feats[f"chm_local_roughness_r{r}"] = chm_local_roughness(arr, transform, point, r, band_names)
             feats[f"chm_asymmetry_r{r}"] = chm_radial_asymmetry(cw)
+            #following column mostly relevant to chm_asymmetry_r
+            feats[f"chm_window_clipped_r{r}"] = float(clipped)
 
     widest = radii_m[-1]
     if "ndvi" in band_names:
