@@ -188,13 +188,17 @@ def chm_peak_ratio(window: np.ndarray) -> float:
 
 
 def chm_skewness(window: np.ndarray) -> float:
+    if window.std() == 0.0:
+        return 0.0
     skew = scipy.stats.skew(window, axis=None)
-    return skew
+    return float(skew)
 
 
 def chm_kurtosis(window: np.ndarray) -> float:
+    if window.std() == 0.0:
+        return 0.0
     kurtosis = scipy.stats.kurtosis(window, axis=None)
-    return kurtosis
+    return float(kurtosis)
 
 
 def chm_local_roughness(arr, transform, point, radius_m, band_names, pad_m=RES_M) -> float:
@@ -251,11 +255,19 @@ def extract_features_from_array(arr: np.ndarray, transform, point: shapely.geome
         pt_val, mean, std, mx, mn = window_stats(arr, transform, point, r)
         for i, name in enumerate(band_names):
             if r == radii_m[0]:
-                feats[f"{name}_point"] = float(pt_val[i])
+                feats[f"{name}_point"] = float(pt_val[i])       
             feats[f"{name}_mean_r{r}"] = float(mean[i])
             feats[f"{name}_std_r{r}"] = float(std[i])
             feats[f"{name}_max_r{r}"] = float(mx[i])
             feats[f"{name}_min_r{r}"] = float(mn[i])
+            
+        if "chm" in band_names:
+            cw = chm_window(arr, transform, point, r, band_names)
+            feats[f"chm_peak_ratio_r{r}"] = chm_peak_ratio(cw)
+            feats[f"chm_skew_r{r}"] = chm_skewness(cw)
+            feats[f"chm_kurtosis_r{r}"] = chm_kurtosis(cw)
+            feats[f"chm_local_roughness_r{r}"] = chm_local_roughness(arr, transform, point, r, band_names)
+            feats[f"chm_asymmetry_r{r}"] = chm_radial_asymmetry(cw)
 
     widest = radii_m[-1]
     if "ndvi" in band_names:
