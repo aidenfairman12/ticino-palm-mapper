@@ -68,6 +68,8 @@ import rasterio
 import shapely
 from rasterio.transform import rowcol
 from shapely.geometry import box
+import scipy.stats
+import scipy.ndimage
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -144,9 +146,7 @@ BAND_NAMES_6 = ["nir", "r", "g", "b", "ndvi", "chm"]
 BAND_NAMES_4 = ["r", "g", "b", "chm"]
 RES_M = 0.1  # SwissImage / feature-stack pixel size, meters/px
 
-
-def window_stats(arr: np.ndarray, transform, point: shapely.geometry.Point, radius_m: float):
-    """(point_value, mean, std, max, min) per band within radius_m of point."""
+def window_helper(arr: np.ndarray, transform, point: shapely.geometry.Point, radius_m: float):
     row, col = rowcol(transform, point.x, point.y)
     H, W = arr.shape[1], arr.shape[2]
     row = max(0, min(row, H - 1))
@@ -155,8 +155,86 @@ def window_stats(arr: np.ndarray, transform, point: shapely.geometry.Point, radi
     r0, r1 = max(0, row - radius_px), min(H, row + radius_px + 1)
     c0, c1 = max(0, col - radius_px), min(W, col + radius_px + 1)
     window = arr[:, r0:r1, c0:c1]
+    
+    return window, row, col, r0, c0
+
+def window_stats(arr: np.ndarray, transform, point: shapely.geometry.Point, radius_m: float):
+    """(point_value, mean, std, max, min) per band within radius_m of point."""
+
+    window, row, col, _, _ = window_helper(arr, transform, point, radius_m)
     point_val = arr[:, row, col]
+    
     return point_val, window.mean(axis=(1, 2)), window.std(axis=(1, 2)), window.max(axis=(1, 2)), window.min(axis=(1, 2))
+
+
+def chm_window(arr: np.ndarray, transform, point: shapely.geometry.Point, radius_m: float,
+                band_names: list[str]) -> np.ndarray:
+    """2D (row, col) window of just the CHM band, for the chm_* shape
+    descriptors below — unlike window_helper's (band, row, col) window
+    across all bands, or window_stats' per-band scalar reductions."""
+    window, _, _, _, _ = window_helper(arr, transform, point, radius_m)
+    return window[band_names.index("chm")]
+
+
+def chm_peak_ratio(window: np.ndarray) -> float:
+    """max height / mean height within the window — a spiky single-stem
+    crown should read higher than a flat rooftop or rounded canopy.
+    Distinct from the existing chm_peakiness (point - widest-radius mean);
+    this is a ratio local to ONE radius, not point-vs-neighborhood."""
+    mean = window.mean()
+    if mean <= 0:
+        return 0.0  # bare ground / no-signal window — ratio is undefined, not infinite
+    return float(window.max() / mean)
+
+
+def chm_skewness(window: np.ndarray) -> float:
+    skew = scipy.stats.skew(window, axis=None)
+    return skew
+
+
+def chm_kurtosis(window: np.ndarray) -> float:
+    kurtosis = scipy.stats.kurtosis(window, axis=None)
+    return kurtosis
+
+
+def chm_local_roughness(arr, transform, point, radius_m, band_names, pad_m=RES_M) -> float:
+    pad_window, _, _, pad_r0, pad_c0 = window_helper(arr, transform, point, radius_m + pad_m)
+    pad_window = pad_window[band_names.index("chm")]
+
+    tgt_window , _, _, tgt_r0, tgt_c0 = window_helper(arr, transform, point, radius_m)
+    
+    top = tgt_r0 - pad_r0
+    left = tgt_c0 - pad_c0
+    h, w = tgt_window.shape[-2:]
+    
+    laplacian = scipy.ndimage.laplace(pad_window)
+    inner = laplacian[top : top + h, left : left + w ]
+    return float(np.std(inner))
+
+def chm_radial_asymmetry(window: np.ndarray, n_sectors: int = 8) -> float:
+    rows, cols = np.indices(window.shape)
+    center_row, center_col = window.shape[0] // 2, window.shape[1] // 2
+    dy, dx = rows - center_row, cols - center_col
+    dist = np.hypot(dy, dx)
+    
+    radius_px = min(center_row, center_col, window.shape[0] - 1 - center_row, window.shape[1] - 1 - center_col)
+    valid = (dist > 0) & (dist <= radius_px)
+    
+    angle = np.arctan2(dy, dx) % (2 * np.pi)
+    sector_width = 2 * np.pi / n_sectors
+    sector_idx = np.minimum((angle // sector_width).astype(int), n_sectors - 1)
+    
+    wedge_means = []
+    for s in range(n_sectors):
+        mask = valid & (sector_idx == s)
+        if mask.sum() == 0:
+            continue
+        wedge_means.append(window[mask].mean())
+        
+    if len(wedge_means) < 2:
+        return 0.0
+    
+    return float(np.var(wedge_means))
 
 
 def extract_features_from_array(arr: np.ndarray, transform, point: shapely.geometry.Point, radii_m: list[float]) -> dict:
