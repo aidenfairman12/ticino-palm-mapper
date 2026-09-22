@@ -9,10 +9,20 @@ canopy-height channel and write a 4-band feature stack: [R, G, B, CHM].
     DSM = ch.swisstopo.swisssurface3d-raster  (surface incl. vegetation, 0.5 m)
     DTM = ch.swisstopo.swissalti3d            (bare terrain, 0.5 m)
 
-The 0.5 m height layers are resampled (bilinear) onto each RGB tile's exact 10 cm
-grid, so the four channels stack pixel-for-pixel. Output is float32 GeoTIFF
-(R,G,B in 0-255, CHM in metres) — your Dataset reads it as a (4,H,W) array and
-normalises however you like.
+DSM and DTM are each read at their OWN native 0.5 m resolution first (over
+identical bounds, which pins them to the same grid without a separate
+alignment step) and DIFFERENCED there, then the resulting CHM is resampled
+(bilinear) onto each RGB tile's exact 10 cm grid as a single final step —
+not resampled-then-subtracted, which would independently interpolate two
+correlated surfaces before differencing them, amplifying interpolation noise
+right at height-discontinuity edges (see resample_array_to's docstring).
+Output is float32 GeoTIFF (R,G,B in 0-255, CHM in metres) — your Dataset
+reads it as a (4,H,W) array and normalises however you like.
+
+NOTE: DSM/DTM's true native resolution is 0.5 m regardless of this fix — CHM
+shape/texture features computed at a finer radius than that (e.g. 1m) are
+measuring resampling smoothness, not real structure. See
+checkpoint-2026-09-18-labeling-ceiling.md's 2026-09-22 update.
 
 WHY (see feasibility notes): RGB alone can't reliably separate palms from other
 crowns at 10 cm; height masks lawn/ground and separates understory palms from tall
@@ -59,20 +69,31 @@ def main() -> None:
               "swissSURFACE3D / swissALTI3D may not be released here yet.")
         return
 
+    NATIVE_LIDAR_RES_M = 0.5  # DSM/DTM's own native resolution -- see resample_array_to
+
     written, skipped = 0, 0
     for tif in tiles:
         with rasterio.open(tif) as src:
             rgb = src.read()  # (3,H,W) uint8
             transform = src.transform
+            bounds = src.bounds
 
-        dsm = st.read_aligned_to(tif, dsm_hrefs, resampling="bilinear")
-        dtm = st.read_aligned_to(tif, dtm_hrefs, resampling="bilinear")
-        if dsm is None or dtm is None:
+        # DSM and DTM read at their OWN native 0.5m resolution, over the SAME
+        # bounds+res -- read_window's output grid is determined by (bounds, res)
+        # alone, so this guarantees both land on an identical grid without
+        # needing to separately verify the two source COGs share one. Only
+        # the DIFFERENCE gets resampled onto the tile's fine 10cm grid, once
+        # -- see resample_array_to's docstring for why that order matters.
+        dsm_native, native_transform = st.read_window(dsm_hrefs, bounds, res=NATIVE_LIDAR_RES_M, resampling="bilinear")
+        dtm_native, _ = st.read_window(dtm_hrefs, bounds, res=NATIVE_LIDAR_RES_M, resampling="bilinear")
+        if dsm_native is None or dtm_native is None:
             skipped += 1
             continue
 
-        chm = (dsm[0] - dtm[0]).astype("float32")
-        chm[chm < 0] = 0.0  # clip negatives (noise / overhangs)
+        chm_native = (dsm_native[0] - dtm_native[0]).astype("float32")
+        chm_native[chm_native < 0] = 0.0  # clip negatives (noise / overhangs)
+
+        chm = st.resample_array_to(chm_native, native_transform, tif, resampling="bilinear")
 
         stack = np.concatenate([rgb.astype("float32"), chm[None, :, :]], axis=0)  # (4,H,W)
         out_path = out_dir / f"{tif.stem}_rgbchm.tif"

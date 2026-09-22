@@ -157,6 +157,44 @@ def read_aligned_to(ref_tif, hrefs, resampling="bilinear"):
     return out
 
 
+def resample_array_to(arr, src_transform, ref_tif, resampling="bilinear"):
+    """Resample an already-in-memory (H,W) array from its own src_transform's
+    grid onto ref_tif's exact grid (bounds, resolution, shape) — one final
+    alignment step, distinct from read_aligned_to's file-based mosaic.
+
+    Exists so a caller can combine several same-resolution inputs (e.g. DSM
+    and DTM, both native 0.5 m) AT THEIR NATIVE GRID first — one shared
+    read_window() bounds+res call each keeps them on an identical grid by
+    construction, so they can be differenced directly — and only resample the
+    RESULT onto a finer reference grid once. Resampling each input separately
+    onto the fine grid before differencing (the previous approach here) means
+    two independent bilinear interpolations of correlated data before a
+    subtraction, which can amplify interpolation noise right at height-
+    discontinuity edges; differencing first and resampling once avoids that.
+    """
+    import numpy as np
+    import rasterio
+    from rasterio.enums import Resampling
+    from rasterio.warp import reproject
+
+    with rasterio.open(ref_tif) as ref:
+        dst_transform = ref.transform
+        H, W = ref.height, ref.width
+        crs = ref.crs
+
+    dst = np.zeros((H, W), dtype=np.float32)
+    reproject(
+        source=arr,
+        destination=dst,
+        src_transform=src_transform,
+        src_crs=crs,
+        dst_transform=dst_transform,
+        dst_crs=crs,
+        resampling=Resampling[resampling],
+    )
+    return dst
+
+
 def write_geotiff(path, arr, transform, nodata=None, dtype=None):
     """Write a (bands,H,W) array as a deflate-compressed EPSG:2056 GeoTIFF."""
     import rasterio
