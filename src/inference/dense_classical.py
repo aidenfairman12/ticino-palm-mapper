@@ -140,7 +140,7 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
-from scipy import ndimage
+from scipy import ndimage, signal
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(_REPO_ROOT))
@@ -287,6 +287,22 @@ def _window_counts(shape: tuple[int, int], size: int) -> np.ndarray:
     ones = np.ones(shape, dtype=np.float64)
     return ndimage.uniform_filter(ones, size=size, mode="constant", cval=0.0) * (size * size)
 
+def _wedge_masks(radius_px: int, n_sectors: int = 8) -> list[np.ndarray]:
+    """8 boolean wedge masks, same disc/angle definition as
+    chm_radial_asymmetry, sized to enclose exactly the radius_px disc."""
+    size = 2 * radius_px + 1
+    rows, cols = np.indices((size, size))
+    center = radius_px
+    dy, dx = rows - center, cols - center
+    dist = np.hypot(dy, dx)
+    valid = (dist > 0) & (dist <= radius_px)
+    angle = np.arctan2(dy, dx) % (2 * np.pi)
+    sector_width = 2 * np.pi / n_sectors
+    sector_idx = np.minimum((angle // sector_width).astype(int), n_sectors - 1)
+    
+    return [(valid & (sector_idx == s)).astype(np.float64) for s in range(n_sectors)]
+
+
 
 def dense_spatial_features(arr: np.ndarray, radii_m: list[float]) -> dict[str, np.ndarray]:
     """Whole-tile equivalent of extract_features_from_array, minus the
@@ -298,7 +314,10 @@ def dense_spatial_features(arr: np.ndarray, radii_m: list[float]) -> dict[str, n
     band_names = BAND_NAMES_6 if arr.shape[0] == 6 else BAND_NAMES_4
     H, W = arr.shape[1], arr.shape[2]
     feats: dict[str, np.ndarray] = {}
-
+    
+    if "chm" in band_names:
+        chm_laplacian = ndimage.laplace(arr[band_names.index("chm")].astype(np.float64))
+        
     for r in radii_m:
         radius_px = max(1, round(r / RES_M))  # same as window_stats
         size = 2 * radius_px + 1
@@ -320,13 +339,65 @@ def dense_spatial_features(arr: np.ndarray, radii_m: list[float]) -> dict[str, n
             # replicate values already inside the truncated window.
             feats[f"{name}_max_r{r}"] = ndimage.maximum_filter(arr[i], size=size, mode="nearest")
             feats[f"{name}_min_r{r}"] = ndimage.minimum_filter(arr[i], size=size, mode="nearest")
+            
+            if name == "chm":
+                chm_band, chm_mean, chm_mean_sq, chm_std = band, mean, mean_sq, std
+
+        if "chm" in band_names:
+            max_r = feats[f"chm_max_r{r}"]
+            mean_r = feats[f"chm_mean_r{r}"]
+            feats[f"chm_peak_ratio_r{r}"] = np.where(mean_r > 0, max_r / mean_r, 0.0).astype(np.float32)
+            
+            mean_cube = _truncated_window_mean(chm_band ** 3, size, counts)
+            mean_quad = _truncated_window_mean(chm_band ** 4, size, counts)
+
+            m2 = chm_std * chm_std  # already float64, already clamped >= 0
+            m3 = mean_cube - 3 * chm_mean * chm_mean_sq + 2 * chm_mean ** 3
+            m4 = mean_quad - 4 * chm_mean * mean_cube + 6 * chm_mean ** 2 * chm_mean_sq - 3 * chm_mean ** 4
+
+            flat = m2 <= 1e-6  # chm variance below (1mm)^2 — treat as flat; catches the
+                    # float64 cancellation residual a perfectly flat window
+                    # leaves after two independent convolution passes, which
+                    # the point path never sees (window.std() on one array
+                    # cancels exactly, this doesn't)
+            safe_m2 = np.where(flat, 1.0, m2)  # placeholder denominator, discarded by the outer where
+            skew = np.where(flat, 0.0, m3 / safe_m2 ** 1.5)
+            kurt = np.where(flat, 0.0, m4 / safe_m2 ** 2 - 3.0)
+
+            feats[f"chm_skew_r{r}"] = skew.astype(np.float32)
+            feats[f"chm_kurtosis_r{r}"] = kurt.astype(np.float32)
+            
+            lap_mean = _truncated_window_mean(chm_laplacian, size, counts)
+            lap_mean_sq = _truncated_window_mean(chm_laplacian ** 2, size, counts)
+            feats[f"chm_local_roughness_r{r}"] = np.sqrt(np.maximum(lap_mean_sq - lap_mean * lap_mean, 0.0)).astype(np.float32)
+            
+            masks = _wedge_masks(radius_px)
+            ones = np.ones((H, W), dtype=np.float64)
+            wedge_means = []
+            for mask in masks:
+                # fftconvolve does true convolution (flips the kernel); flipping the
+                # mask first cancels that, giving correlation — matching the point
+                # path's window[mask] lookup, which is unflipped by construction.
+                flipped = mask[::-1, ::-1]
+                wsum = signal.fftconvolve(chm_band, flipped, mode="same")
+                wcount = signal.fftconvolve(ones, flipped, mode="same")
+                safe_count = np.where(wcount > 0.5, wcount, 1.0)
+                wedge_means.append(np.where(wcount > 0.5, wsum / safe_count, 0.0))
+
+            wedge_stack = np.stack(wedge_means, axis=0)  # (8, H, W)
+            feats[f"chm_asymmetry_r{r}"] = np.var(wedge_stack, axis=0).astype(np.float32)
+ 
+            row_idx, col_idx = np.indices((H, W))
+            feats[f"chm_window_clipped_r{r}"] = (
+                    (row_idx < radius_px) | (row_idx >= H - radius_px)|
+                    (col_idx < radius_px) | (col_idx >= W - radius_px)
+                    ).astype(np.float32)
 
     widest = radii_m[-1]
     if "ndvi" in band_names:
         feats["ndvi_contrast"] = feats["ndvi_point"] - feats[f"ndvi_mean_r{widest}"]
     if "chm" in band_names:
         feats["chm_peakiness"] = feats["chm_point"] - feats[f"chm_mean_r{widest}"]
-
     return feats
 
 
