@@ -15,25 +15,46 @@
 # feature_stack_rs_20240810, the two never-processed dates confirmed native
 # 10cm (same as March, unlike the two 25cm dates currently in the pipeline).
 #
-# No code changes needed -- 07_build_nir_stack.py already supports arbitrary
-# --rs-date values and the AOI config already anticipated this exact usage
-# (see its imagery.rs_date comment). This iterates over EVERY tile in the
-# 03-built feature_stack grid (~5900 tiles) and skips ones with no RS
-# coverage for that date, so 2024-07-20 (only 2 raw strips, a small
-# footprint) should be fast; 2024-08-10 (4 strips) somewhat more so. `set -e`
-# is deliberately OMITTED here -- if the first date's run has an issue, the
-# second date should still get a chance to run rather than the whole job
-# dying after date 1.
+# Turned out to be a 3-stage chain, not just 07 -- scratch cleanup had
+# already claimed 00's raw RGB tiles AND 03's [R,G,B,CHM] feature_stack (both
+# purely-derived, regenerable outputs; nothing irreplaceable was lost, see
+# the 2026-09-22 conversation), so both need rebuilding across the WHOLE AOI
+# (~5900 tiles) before 07 has anything to read for the new dates:
+#
+#   1. 00_fetch_swissimage.py -- free RGB from swisstopo STAC (no account,
+#      no local upload needed)
+#   2. 03_build_feature_stack.py -- LiDAR CHM (now using the fixed
+#      native-resolution-diff-then-resample method, not the old
+#      resample-then-subtract one -- this is also this fix's first real
+#      full-AOI exercise)
+#   3. 07_build_nir_stack.py, once per new date -- fuses in the paid RS
+#      delivery (already safe in git-tracked data/raw/, no upload needed)
+#
+# `set -e`: each stage genuinely depends on the previous succeeding here
+# (unlike the old 07-only version, where the two dates were independent of
+# each other) -- no point starting 03 if 00 failed, or 07 if 03 failed.
+#
+# Confirmed ~1TB+ free needed (per configs/bellinzona_full_nir.yaml's own
+# note) -- this is a purely-regenerable CACHE though, not something to
+# protect from future scratch cleanup; re-running this job is the recovery
+# plan, not a home-directory backup.
 #
 # Run from the repo root: sbatch slurm/build_10cm_nir_stacks.sbatch
+set -e
 mkdir -p logs/build_10cm_nir_stacks
 
 module load Python/3.11.3-GCCcore-12.3.0
 
-for date in 20240720 20240810; do
-    echo "=== building feature_stack_rs_$date  $(date) ==="
-    python scripts/07_build_nir_stack.py --config configs/bellinzona_full_nir.yaml --rs-date "$date"
-    echo "=== done with $date  $(date) ==="
+echo "=== [1/3] 00_fetch_swissimage.py (free RGB, whole AOI) $(date) ==="
+python scripts/00_fetch_swissimage.py --config configs/bellinzona_full_nir.yaml
+
+echo "=== [2/3] 03_build_feature_stack.py (LiDAR CHM, fixed method, whole AOI) $(date) ==="
+python scripts/03_build_feature_stack.py --config configs/bellinzona_full_nir.yaml
+
+for rs_date in 20240720 20240810; do
+    echo "=== [3/3] 07_build_nir_stack.py --rs-date $rs_date $(date) ==="
+    python scripts/07_build_nir_stack.py --config configs/bellinzona_full_nir.yaml --rs-date "$rs_date"
+    echo "=== done with $rs_date  $(date) ==="
 done
 
 module unload Python/3.11.3-GCCcore-12.3.0
