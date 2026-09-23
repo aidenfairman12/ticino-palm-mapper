@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-01_fetch_infoflora.py
-=====================
-Load *Trachycarpus fortunei* occurrence points, clip to the AOI, reproject to
+"""Load *Trachycarpus fortunei* occurrence points, clip to the AOI, reproject to
 EPSG:2056, and save a clean GeoJSON of presence points.
 
 Two routes (set `labels.source` in the config):
@@ -26,6 +23,10 @@ NOTE on the earlier "AtlasWS_*.csv" export: that was a Welten-Sutter species
 *checklist* for a mapping square (one row per species, NO coordinates) — it cannot
 place point labels. The export you want is one row per *observation* with X/Y. The
 GBIF route below produces exactly that.
+
+Superseded for the live bellinzona_full_nir AOI: this only ever ran against the
+small pilot AOI. Real labels there come from manual review (scripts/06, 25), not
+these occurrence points — kept for reference, not part of the current pipeline.
 """
 from __future__ import annotations
 
@@ -194,7 +195,7 @@ def main() -> None:
 
     if len(gdf) == 0:
         print("[warn] zero points in AOI — check the bbox and the source, "
-              "or pick an AOI known to contain palms (e.g. around Lugano).")
+              "or pick an AOI known to contain palms (e.g. around Bellinzona).")
 
 
 if __name__ == "__main__":

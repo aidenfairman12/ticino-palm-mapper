@@ -74,7 +74,7 @@ pip install rasterio rioxarray geopandas shapely pyproj fiona numpy pandas \
             xarray scikit-image scikit-learn matplotlib pyyaml tqdm requests
 # (or the full conda env: conda env create -f environment.yml)
 
-# 2. a palm-dense sanity AOI near Lugano is preset in configs/aoi_example.yaml
+# 2. a palm-dense sanity AOI near Bellinzona is preset in configs/aoi_example.yaml
 
 # 3. fetch imagery for the AOI
 python scripts/00_fetch_swissimage.py --config configs/aoi_example.yaml

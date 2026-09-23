@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-19_harvest_deciduous_negatives.py
-==================================
-Harvest confident non-palm negatives from the March (leaf-off) / leaf-on
+"""Harvest confident non-palm negatives from the March (leaf-off) / leaf-on
 NDVI-drop signal validated visually in scripts/18's `grid` mode, at the scale
 a real training run needs (thousands, not the ~40 eyeballed by hand).
 
@@ -16,9 +13,7 @@ The March flight sidesteps that entirely: T. fortunei is evergreen, so a
 location that visibly loses NDVI between March and leaf-on is deciduous,
 which is a confident non-palm — no visual species identification required.
 
-WHY THIS SCANS TILES, NOT RANDOM POINTS
-----------------------------------------
-scripts/18's sample_canopy_controls draws a random tile from the FULL
+Why this scans tiles, not random points: scripts/18's sample_canopy_controls draws a random tile from the FULL
 leaf-on set, then rejects most draws for lacking March coverage (the March
 flight covers ~29% of the footprint). That is fine for a handful of
 examples; wasteful at the scale a real negative set needs. Every March tile
@@ -34,9 +29,7 @@ every qualifying pixel, since neighbouring pixels are not independent
 samples and a training set of literally every canopy pixel in Bellinzona
 would be redundant and slow to extract features for.
 
-THE SHADOW GATE
-----------------
-NDVI is a ratio of NIR and red reflectance, and shadow depresses both
+The shadow gate: NDVI is a ratio of NIR and red reflectance, and shadow depresses both
 unevenly — a textbook confound, not specific to this data. March (low winter
 sun, long shadows) and leaf-on (high summer sun, short shadows) cast
 DIFFERENT shadow patterns on the same tree, so a shadowed evergreen can show
@@ -53,9 +46,7 @@ values here are uncalibrated ~hundreds-to-thousands range digital numbers,
 not reflectance — and --shadow-ratio is deliberately exposed as a tunable,
 not baked in as a fixed constant.
 
-OUTPUT
-------
-A GeoJSON of harvested points, same shape as active_learning_hard_negatives
+Output: a GeoJSON of harvested points, same shape as active_learning_hard_negatives
 .geojson (geometry + provenance columns). scripts/15's --hard-negatives
 loader only ever reads .geometry — see load_confirmed_points /
 build_rows in scripts/15_extract_classical_features.py — so extra columns

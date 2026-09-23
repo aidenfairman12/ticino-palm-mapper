@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-06_prioritize_labels.py
-========================
-Rank occurrence points by how CHEAP they are to hand-verify, so labeling effort
+"""Rank occurrence points by how CHEAP they are to hand-verify, so labeling effort
 goes to the candidates most likely to pay off first.
 
 Two independent filters, both free / no API key:
@@ -20,7 +17,7 @@ Output: a CSV ranked by (near a road) AND (has NIR), then by distance, so the
 best-value candidates — checkable AND NIR-covered — sort to the top. Also
 regenerates the labeling-assist HTML restricted to the top candidates.
 
-STATUS: implemented. This produces a SHORTLIST, not labels — every candidate
+This produces a SHORTLIST, not labels — every candidate
 still needs a human to actually look at Street View / the crop and decide.
 """
 from __future__ import annotations
@@ -80,7 +77,7 @@ def main() -> None:
     aoi = cfg["aoi"]["name"]
     bbox = cfg["aoi"]["bbox_lv95"]
     near_road_m = cfg["labels"].get("near_road_m", 25)
-    rs_dir = cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/lugano_delivery_2026-07")
+    rs_dir = cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/bellinzona_delivery_2026-07")
 
     occ_path = Path(cfg["paths"]["interim_dir"]) / "labels" / f"{aoi}_occurrences.geojson"
     if not occ_path.exists():

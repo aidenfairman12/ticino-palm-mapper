@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-18_compare_views.py
-===================
-Test whether a different VIEW of the same data makes palms adjudicable by eye,
+"""Test whether a different VIEW of the same data makes palms adjudicable by eye,
 and whether the March flight separates evergreen from deciduous numerically.
 
 Why this exists: the binding constraint on this project is not the model, it is

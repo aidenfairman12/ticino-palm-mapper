@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-13_export_baseline_checkpoint.py
-================================
-Exports a checkpoint in the same format pretrain_ssl.py's save_checkpoint
+"""Exports a checkpoint in the same format pretrain_ssl.py's save_checkpoint
 produces, but using the PLAIN pretrained DINOv2 backbone — no continued
 MAE pretraining on domain imagery at all. Not a trained checkpoint; the
 model weights are exactly what timm.create_model(..., pretrained=True)
@@ -30,8 +27,6 @@ epoch=0 and best_val_loss=nan are used as sentinels marking this as NOT a
 real trained checkpoint, in case anyone is tempted to --resume-from it —
 that would silently "resume" training from epoch 1 of a checkpoint that
 was never actually trained.
-
-STATUS: implemented.
 """
 from __future__ import annotations
 

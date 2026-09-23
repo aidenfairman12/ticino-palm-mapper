@@ -1,5 +1,5 @@
 """Quick, standalone sharpness check on the RAW delivered strips themselves
-(data/raw/swissimage_rs/lugano_delivery_2026-07), before investing effort in
+(data/raw/swissimage_rs/bellinzona_delivery_2026-07), before investing effort in
 running 07_build_nir_stack.py for the three never-processed leaf-on dates
 (2022-07-15, 2024-07-20, 2024-08-10).
 
@@ -33,7 +33,7 @@ from each date's own raster via its own affine transform.
 
 Run on the HPC login node, where rasterio + these raw files both live:
     python3 scripts/23_check_raw_sharpness.py \
-        --rs-dir data/raw/swissimage_rs/lugano_delivery_2026-07 \
+        --rs-dir data/raw/swissimage_rs/bellinzona_delivery_2026-07 \
         --dates 20210324 20210811 20240821 20220715 20240720 20240810
 """
 from __future__ import annotations

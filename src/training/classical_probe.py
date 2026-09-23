@@ -37,7 +37,7 @@ from sklearn.ensemble import RandomForestClassifier
 # it label-correlated rather than merely useless:
 #   - sample_negative_points draws a random TILE then a uniform point inside
 #     it, so locations in overlaps get several chances to be drawn; measured on
-#     lugano_example's tiling, negatives land in overlaps 1.21x more often than
+#     bellinzona_example's tiling, negatives land in overlaps 1.21x more often than
 #     an area-uniform point would.
 #   - on the real feature table the split is clearer still — positives have
 #     median n_dates_covered 2.0 (max 12), negatives median 4.0 (max 8).

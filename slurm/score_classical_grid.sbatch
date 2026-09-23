@@ -48,10 +48,10 @@ start_time=$SECONDS
 
 module load Python/3.11.3-GCCcore-12.3.0
 python -m src.inference.score_candidates_classical \
-    --features-csv classical_features.csv \
+    --features-csv classical_features/classical_features.csv \
     --tile-dirs "${TILE_DIRS[@]}" \
-    --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
-    --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
+    --confirmed-points data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson \
+    --scouted-points data/interim/labels/bellinzona_new_candidates_scouted.geojson \
     --hard-negatives data/interim/labels/active_learning_hard_negatives.geojson \
     --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
     --n-samples 2000000 \

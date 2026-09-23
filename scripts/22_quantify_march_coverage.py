@@ -39,11 +39,11 @@ X0, Y0, STRIDE, SIZE = 2715098.0, 1120181.0, 89.6, 102.4
 MARCH_DIR = "feature_stack_rs_20210324"
 
 CONFIRMED_FILES = [
-    "lugano_MASTER_confirmed_palms.geojson",       # merges batch2/3/4 + example
+    "bellinzona_MASTER_confirmed_palms.geojson",       # merges batch2/3/4 + example
     "active_learning_confirmed_palms.geojson",
 ]
 SCOUTED_FILES = [
-    "lugano_new_candidates_scouted.geojson",
+    "bellinzona_new_candidates_scouted.geojson",
 ]
 
 
@@ -107,7 +107,7 @@ def report(label: str, points, by_date):
     print(f"  in AOI but outside March:    {len(in_fp_not_march):4d}  ({100*len(in_fp_not_march)/n:.1f}%)")
     print(f"  outside bellinzona_full_nir footprint entirely: {len(outside):4d}  ({100*len(outside)/n:.1f}%)")
     if outside:
-        print(f"    (likely lugano_example / other-AOI points, not bellinzona): {outside[:5]}{'...' if len(outside) > 5 else ''}")
+        print(f"    (likely from the separate bellinzona_example pilot AOI, not bellinzona_full_nir): {outside[:5]}{'...' if len(outside) > 5 else ''}")
     return in_march, in_fp_not_march, outside
 
 

@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-10_review_candidates.py
-=======================
-Build an HTML review sheet for score_candidates.py's output — same
+"""Build an HTML review sheet for score_candidates.py's output — same
 Street View / satellite / swisstopo cross-referencing workflow as
 05_labeling_assist.py, but sourced from model-scored random locations
 (ranked by predicted probability) instead of raw GBIF occurrence points.
@@ -21,7 +18,7 @@ arbitrary nearby view. Uses a percentile contrast stretch for display
 delivery imagery is not standard 8-bit, a naive 0-255 clip would blow
 every pixel to white).
 
-STATUS: implemented. Pure review tool — writes no labels itself.
+Pure review tool — writes no labels itself.
 """
 from __future__ import annotations
 

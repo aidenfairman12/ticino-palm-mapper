@@ -51,7 +51,7 @@ labels:
   assist_max: 60
   assist_window_m: 24
   near_road_m: 25
-  rs_dir: "data/raw/swissimage_rs/lugano_delivery_2026-07"  # delivered NIR tiles
+  rs_dir: "data/raw/swissimage_rs/bellinzona_delivery_2026-07"  # delivered NIR tiles
 
 paths:
   raw_dir: "data/raw"

@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-15_extract_classical_features.py
-=================================
-Builds a tabular feature file (one row per labeled point x covering tile,
+"""Builds a tabular feature file (one row per labeled point x covering tile,
 same unit-of-example as PalmProbeDataset/linear_probe.py) for training a
 classical model (random forest / gradient-boosted trees) as a cheaper,
 interpretable alternative to the ViT-embedding + linear-probe pipeline.
@@ -22,7 +19,7 @@ Per-band features, per --radii-m (default 1/3/5m):
     within radius R meters
 Derived:
   - ndvi_contrast: point NDVI minus the widest-radius neighborhood mean —
-    formalizes the same idea as lugano_MASTER_confirmed_palms.geojson's
+    formalizes the same idea as bellinzona_MASTER_confirmed_palms.geojson's
     hand-tuned ndvi_contrast_current field, computed uniformly for every
     point instead of by manual review.
   - chm_peakiness: point CHM minus the widest-radius neighborhood mean —
@@ -41,7 +38,7 @@ adapt-patch-embed-channel-misalignment-bug / c021_r076 investigation) so a
 leave-one-tile-out CV loop can group rows identically to linear_probe.py's,
 for an apples-to-apples comparison against its reported accuracy.
 
-STATUS: feature extraction only — deliberately does not include the
+Feature extraction only — deliberately does not include the
 model-training/CV loop. Load the output CSV and take it from there (a
 leave-one-tile-out split grouped by `fold_tile`, mirroring
 leave_one_tile_out_cv in src/training/linear_probe.py, is the natural
@@ -402,7 +399,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--radii-m", type=float, nargs="+", default=[1.0, 3.0, 5.0])
     p.add_argument("--in-chans", type=int, default=6, choices=[4, 6])
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--output", type=Path, default=Path("classical_features.csv"))
+    p.add_argument("--output", type=Path, default=Path("classical_features/classical_features.csv"))
     return p.parse_args()
 
 

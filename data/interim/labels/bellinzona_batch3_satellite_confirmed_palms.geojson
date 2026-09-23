@@ -1,6 +1,6 @@
 {
 "type": "FeatureCollection",
-"name": "lugano_batch3_satellite_confirmed_palms",
+"name": "bellinzona_batch3_satellite_confirmed_palms",
 "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::2056" } },
 "features": [
 { "type": "Feature", "properties": { "id": "batch3_q1", "x": 2719928.660086805, "y": 1115755.0151361106, "lat": 46.182581607847034, "lon": 8.9919136240405955, "rs_dates_available": "20210811,20220715,20240810,20240821", "source": "satellite_landmark_match", "ndvi_at_point": 0.38, "ndvi_near_3m": 0.19, "ndvi_background": 0.17, "ndvi_contrast": 0.02, "ndvi_signal": "none", "note": "adjacent block to batch2 suburban cluster, ~70-135m away; several points <15m apart", "ndvi_near_v2": 0.19, "ndvi_bg_v2": -0.02, "ndvi_contrast_v2": 0.21, "ndvi_signal_v2": "distinct", "bg_clean_pixels_v2": 91098 }, "geometry": { "type": "Point", "coordinates": [ 2719928.660086805000901, 1115755.015136110596359 ] } },

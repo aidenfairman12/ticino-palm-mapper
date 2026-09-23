@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-16_tune_classical_model.py
-===========================
-Grid-searches src/training/classical_probe.py's RandomForestClassifier or
+"""Grid-searches src/training/classical_probe.py's RandomForestClassifier or
 XGBClassifier hyperparameters (--model rf|xgboost), using a FIXED fold
 split (single --fold-seed) across every candidate so the comparison is
 apples-to-apples — see classical_probe.py's leave_one_tile_out_cv
@@ -26,7 +23,7 @@ pick). Rank by pooled accuracy, then for the top N candidates, re-run
 across several different --model-seed values (fold split still fixed) to
 check the same accuracy isn't just a lucky model-fit init.
 
-STATUS: implemented, driver-only — reuses classical_probe.py's functions,
+Driver-only — reuses classical_probe.py's functions,
 no modeling logic duplicated here.
 """
 from __future__ import annotations

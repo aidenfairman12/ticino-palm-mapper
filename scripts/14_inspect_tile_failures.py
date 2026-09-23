@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-14_inspect_tile_failures.py
-===========================
-Visual inspection tool for specific tiles where leave-one-tile-out CV
+"""Visual inspection tool for specific tiles where leave-one-tile-out CV
 showed poor recall on their confirmed positives — renders every known
 positive location within the given tiles as a read-only card (RGB crop +
 what a probe trained on all current labels currently predicts for it), so
@@ -20,7 +17,7 @@ the CV fold's did, so if it's STILL confidently wrong even with this
 tile's own examples included in training, that's a stronger sign of a
 real, hard case rather than an artifact of what got held out).
 
-STATUS: implemented. Read-only — writes no labels, corrects nothing.
+Read-only — writes no labels, corrects nothing.
 """
 from __future__ import annotations
 

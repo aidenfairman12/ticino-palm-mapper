@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-00_fetch_swissimage.py
-======================
-Fetch SWISSIMAGE 10 cm orthophoto coverage for the configured AOI and cut it into
+"""Fetch SWISSIMAGE 10 cm orthophoto coverage for the configured AOI and cut it into
 model-ready tiles (single vintage). For a multi-year time series use
 04_fetch_temporal.py; both share src/data/swisstopo.py.
 

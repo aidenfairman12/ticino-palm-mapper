@@ -33,7 +33,7 @@ from pyproj import Transformer
 NS = {"kml": "http://www.opengis.net/kml/2.2"}
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LABELS_DIR = REPO_ROOT / "data" / "interim" / "labels"
-CONFIRMED_FILES = ["lugano_MASTER_confirmed_palms.geojson", "active_learning_confirmed_palms.geojson"]
+CONFIRMED_FILES = ["bellinzona_MASTER_confirmed_palms.geojson", "active_learning_confirmed_palms.geojson"]
 DUP_TOLERANCE_DEG = 1e-5  # ~1m
 
 

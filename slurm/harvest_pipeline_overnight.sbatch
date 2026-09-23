@@ -47,11 +47,11 @@ TILE_DIRS=(
     /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210811
     /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821
 )
-FEATURES_CSV=classical_features_with_harvest.csv
+FEATURES_CSV=classical_features/classical_features_with_harvest.csv
 DENSE_OUT_DIR=dense_scores_harvest
 POINTS=(
     data/interim/labels/active_learning_confirmed_palms.geojson
-    data/interim/labels/lugano_MASTER_confirmed_palms.geojson
+    data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson
 )
 
 module load Python/3.11.3-GCCcore-12.3.0
@@ -59,8 +59,8 @@ module load Python/3.11.3-GCCcore-12.3.0
 echo "=== [1/4] feature extraction $(date) ==="
 python scripts/15_extract_classical_features.py \
     --tile-dirs "${TILE_DIRS[@]}" \
-    --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
-    --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
+    --confirmed-points data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson \
+    --scouted-points data/interim/labels/bellinzona_new_candidates_scouted.geojson \
     --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
     --hard-negatives \
         data/interim/labels/active_learning_hard_negatives.geojson \

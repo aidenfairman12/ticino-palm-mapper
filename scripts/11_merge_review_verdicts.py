@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-11_merge_review_verdicts.py
-===========================
-Merge a candidate_verdicts.csv (exported from 10_review_candidates.py's
+"""Merge a candidate_verdicts.csv (exported from 10_review_candidates.py's
 review page) into the labeled dataset.
 
   - verdict == "palm"      -> appended to --positives-output, using
@@ -23,7 +20,7 @@ exists, new rows are concatenated onto it (existing rows untouched), so
 running this after every review batch accumulates labels over time rather
 than overwriting.
 
-STATUS: implemented. Pure merge tool — does not touch training/eval code.
+Pure merge tool — does not touch training/eval code.
 """
 from __future__ import annotations
 

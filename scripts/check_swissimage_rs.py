@@ -8,7 +8,7 @@ imports of rasterio/attr with "module 'inspect' has no attribute 'signature'".
 
 The RS GeoTIFFs ship with NO embedded CRS (only a .tfw world file). Their
 coordinates are valid EPSG:2056 (CH1903+/LV95) — this script assigns that CRS so
-everything lines up, and checks each tile against the Lugano palm AOI.
+everything lines up, and checks each tile against the Bellinzona palm AOI.
 """
 from __future__ import annotations
 
@@ -21,10 +21,10 @@ from rasterio.coords import disjoint_bounds
 
 DEFAULT_RS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "raw", "swissimage_rs", "lugano_delivery_2026-07",
+    "data", "raw", "swissimage_rs", "bellinzona_delivery_2026-07",
 )
 RS_DIR = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_RS_DIR
-AOI = (2718000, 1115000, 2718500, 1115500)  # Lugano palm AOI, EPSG:2056
+AOI = (2718000, 1115000, 2718500, 1115500)  # Bellinzona palm AOI, EPSG:2056
 CRS = "EPSG:2056"
 
 

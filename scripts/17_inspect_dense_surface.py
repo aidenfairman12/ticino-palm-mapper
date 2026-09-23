@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-17_inspect_dense_surface.py
-===========================
-Read out a probability surface from src/inference/dense_classical.py against
+"""Read out a probability surface from src/inference/dense_classical.py against
 the confirmed-palm points, and answer the question the dense pass exists for:
 at a known multi-palm cluster, does the surface resolve into one maximum per
 palm, or one blob for the whole group?

@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-09_export_nir_extent_kml.py
-============================
-Export a KML of the FULL delivered NIR/RS footprint (all strips, not just the
+"""Export a KML of the FULL delivered NIR/RS footprint (all strips, not just the
 current tiny AOI), so a much larger area can be visually scanned for palms
 before picking a new, more representative AOI.
 
@@ -26,7 +23,7 @@ Layers in the output:
   - The current AOI box (red outline) — what's already processed into tiles.
   - The 39 existing confirmed points, colored by ndvi_signal_current.
 
-STATUS: implemented. Read-only — writes no labels itself.
+Read-only — writes no labels itself.
 """
 from __future__ import annotations
 
@@ -82,7 +79,7 @@ def main() -> None:
     aoi = cfg["aoi"]["name"]
     to_wgs = Transformer.from_crs(PROJECT_CRS, "EPSG:4326", always_xy=True)
 
-    rs_dir = Path(cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/lugano_delivery_2026-07"))
+    rs_dir = Path(cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/bellinzona_delivery_2026-07"))
     rs_tiles = sorted(rs_dir.glob("*.tif"))
     if not rs_tiles:
         raise SystemExit(f"No NIR/RS tiles found in {rs_dir}")
@@ -100,7 +97,7 @@ def main() -> None:
     aoi_placemark = _polygon_kml("CURRENT AOI (already processed)", "0000ff", aoi_ring, fill_alpha="55")
 
     # existing confirmed points, for reference
-    master_path = Path(cfg["paths"]["interim_dir"]) / "labels" / "lugano_MASTER_confirmed_palms.geojson"
+    master_path = Path(cfg["paths"]["interim_dir"]) / "labels" / "bellinzona_MASTER_confirmed_palms.geojson"
     point_placemarks = []
     # KML colors are AABBGGRR; these are the BBGGRR part (no alpha):
     # 00ff00=green, 00ffff=yellow, 0000ff=red.

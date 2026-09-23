@@ -267,7 +267,7 @@ if __name__ == "__main__":
     #   print(y.shape, y.dtype, y.sum().item())  # sum ~ implied palm count
     #
     # Get this boring plumbing verified correct before touching a model.
-    tile_dir = Path("data/processed/lugano_example/feature_stack")
+    tile_dir = Path("data/processed/bellinzona_example/feature_stack")
     tile_paths = list(tile_dir.glob("*_rgbchm.tif"))
     stats = compute_channel_stats(tile_paths)
     #print(stats.mean, stats.std)
@@ -277,12 +277,12 @@ if __name__ == "__main__":
     #normed = normalize(arr, stats)
     #print(normed.min(), normed.max(), normed.mean(axis=(1,2)))
     
-    #geojson = "data/interim/labels/lugano_MASTER_confirmed_palms.geojson"
+    #geojson = "data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson"
     #load_confirmed_points(geojson)
     
-    points = load_confirmed_points(Path("data/interim/labels/lugano_MASTER_confirmed_palms.geojson"))
+    points = load_confirmed_points(Path("data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson"))
 
-    tile_dir = Path("data/processed/lugano_example/feature_stack")
+    tile_dir = Path("data/processed/bellinzona_example/feature_stack")
     for tile_path in tile_dir.glob("*_rgbchm.tif"):
         arr, transform, crs = load_tile(tile_path)
         tile_shape = arr.shape[1:]  # (H, W) — drop the channel dim

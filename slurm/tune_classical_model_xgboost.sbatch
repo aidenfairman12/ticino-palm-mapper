@@ -38,7 +38,7 @@ module load Python/3.11.3-GCCcore-12.3.0
 start_time=$SECONDS
 
 python -m scripts.16_tune_classical_model \
-    --features-csv classical_features.csv \
+    --features-csv classical_features/classical_features.csv \
     --model xgboost \
     --fold-seed 0 \
     --model-seed 42 \

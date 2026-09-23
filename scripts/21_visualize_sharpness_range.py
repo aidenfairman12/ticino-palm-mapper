@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-21_visualize_sharpness_range.py
-================================
-Visual sanity check on scripts/20's Laplacian-variance sharpness ranking: for
+"""Visual sanity check on scripts/20's Laplacian-variance sharpness ranking: for
 each acquisition date, render real RGB crops spanning that date's OWN
 sharpness distribution from lowest to highest, so the ~50x gap reported
 between March and the two leaf-on dates can be checked against actual

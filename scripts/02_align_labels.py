@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-02_align_labels.py
-==================
-Align Info Flora presence points to the imagery tiles produced by
+"""Align Info Flora presence points to the imagery tiles produced by
 `00_fetch_swissimage.py`, producing model-ready labels.
 
 For each image tile this writes:
@@ -18,9 +15,10 @@ labels where palms were *recorded*; it does not invent labels where none exist a
 does not guarantee completeness. For honest evaluation you still need a small,
 EXHAUSTIVELY hand-labeled held-out test set.
 
-STATUS: skeleton. The geometry/affine math is real; it assumes tiles from script 00
-exist as GeoTIFFs with valid georeferencing. Until script 00 is wired up, run this
-against any georeferenced test raster to sanity-check the alignment logic.
+Superseded for the live bellinzona_full_nir AOI: labels there come from manual
+review (scripts/06, 25) rather than aligned GBIF/Info Flora occurrence points.
+This never ran past the small pilot AOI — kept for reference, not part of the
+current labeling pipeline.
 """
 from __future__ import annotations
 

@@ -35,11 +35,11 @@ python scripts/15_extract_classical_features.py \
         /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210324 \
         /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20210811 \
         /rs_scratch/users/af26g813/ticino-palm-mapper/data/processed/bellinzona_full_nir/feature_stack_rs_20240821 \
-    --confirmed-points data/interim/labels/lugano_MASTER_confirmed_palms.geojson \
-    --scouted-points data/interim/labels/lugano_new_candidates_scouted.geojson \
+    --confirmed-points data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson \
+    --scouted-points data/interim/labels/bellinzona_new_candidates_scouted.geojson \
     --reviewed-positives data/interim/labels/active_learning_confirmed_palms.geojson \
     --hard-negatives \
         data/interim/labels/active_learning_hard_negatives.geojson \
         data/interim/labels/harvested_deciduous_negatives.geojson \
-    --output classical_features_with_harvest.csv
+    --output classical_features/classical_features_with_harvest.csv
 module unload Python/3.11.3-GCCcore-12.3.0

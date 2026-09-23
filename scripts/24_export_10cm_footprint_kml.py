@@ -12,7 +12,7 @@ covered by ALL THREE for change-based features, so what matters here is less
 each date's individual footprint and more their intersection.
 
 Confirmed palms are pooled from both label sources (active_learning +
-lugano_MASTER, which itself merges the batch2-4 + example sets), deduplicated
+bellinzona_MASTER, which itself merges the batch2-4 + example sets), deduplicated
 on exact coordinates, same as scripts/22_quantify_march_coverage.py.
 
 Usage (run where geopandas/rasterio/pyproj are available, e.g. the HPC login
@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RS_DIR = REPO_ROOT / "data" / "raw" / "swissimage_rs" / "lugano_delivery_2026-07"
+RS_DIR = REPO_ROOT / "data" / "raw" / "swissimage_rs" / "bellinzona_delivery_2026-07"
 LABELS_DIR = REPO_ROOT / "data" / "interim" / "labels"
 OUT_DIR = REPO_ROOT / "data" / "processed" / "_exploration"
 
@@ -38,7 +38,7 @@ TEN_CM_DATES = {
     "20240720": ("2024-07-20", "00ff00"),               # green
     "20240810": ("2024-08-10", "00a5ff"),               # orange
 }
-CONFIRMED_FILES = ["lugano_MASTER_confirmed_palms.geojson", "active_learning_confirmed_palms.geojson"]
+CONFIRMED_FILES = ["bellinzona_MASTER_confirmed_palms.geojson", "active_learning_confirmed_palms.geojson"]
 
 
 def _polygon_kml(name: str, color_abgr: str, coords_lonlat: list[tuple[float, float]],

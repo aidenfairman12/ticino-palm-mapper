@@ -41,7 +41,7 @@ NATIVE_10CM_DIRS = [
 ]
 
 CONFIRMED_FILES = [
-    "lugano_MASTER_confirmed_palms.geojson",
+    "bellinzona_MASTER_confirmed_palms.geojson",
     "active_learning_confirmed_palms.geojson",
     "google_earth_review_batch1_confirmed_palms.geojson",
     "google_earth_review_batch2_confirmed_palms.geojson",

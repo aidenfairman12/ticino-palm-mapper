@@ -192,7 +192,7 @@ s.addText("palmTrack/\n  Sample_SWISSIMAGE_RS/     66 GB loose\n  Sample_SWISSIM
   { x: M + 0.35, y: 2.3, w: 5.3, h: 3.7, fontFace: CODE, fontSize: 10.5, color: CREAM, lineSpacingMultiple: 1.25, margin: 0 });
 card(s, M + 6.23, 1.7, 5.9, 4.5, DARK);
 s.addText("AFTER — inside the repo", { x: M + 6.58, y: 1.9, w: 5.2, h: 0.3, fontFace: BODY, fontSize: 11, bold: true, color: MOSS, charSpacing: 2, margin: 0 });
-s.addText("ticino-palm-mapper/\n  data/raw/swissimage_rs/\n    lugano_delivery_2026-07/   25 tiles\n    bern_sample_2019/\n  scripts/\n    00–05 pipeline\n    check_swissimage_rs.py\n  reports/\n    *.pptx  +  src/ build tooling\n  src/  configs/  docs/",
+s.addText("ticino-palm-mapper/\n  data/raw/swissimage_rs/\n    bellinzona_delivery_2026-07/   25 tiles\n    bern_sample_2019/\n  scripts/\n    00–05 pipeline\n    check_swissimage_rs.py\n  reports/\n    *.pptx  +  src/ build tooling\n  src/  configs/  docs/",
   { x: M + 6.58, y: 2.3, w: 5.3, h: 3.7, fontFace: CODE, fontSize: 10.5, color: CREAM, lineSpacingMultiple: 1.25, margin: 0 });
 card(s, M, 6.35, 12.13, 0.75, CREAM);
 s.addText([{ text: "Committed & pushed. ", options: { bold: true, color: FOREST } },

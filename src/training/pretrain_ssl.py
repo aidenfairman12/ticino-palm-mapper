@@ -257,7 +257,7 @@ def parse_pretrain_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="MAE-style SSL pretraining over PalmSSLDataset.")
     p.add_argument(
         "--tile-dirs", type=Path, nargs="+",
-        default=[Path("data/processed/lugano_example/feature_stack")],
+        default=[Path("data/processed/bellinzona_example/feature_stack")],
         help="One or more directories of *_rgbchm.tif (4ch) or *_nirchm.tif (6ch) "
              "tiles to train on. Pass multiple space-separated paths to combine several "
              "NIR-date stacks into one training pool (all must share the same in_chans).",

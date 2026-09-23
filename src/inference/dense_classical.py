@@ -21,9 +21,7 @@ point labels. They carry no count semantics — the surface does not integrate
 to a palm count, and nothing constrains neighbouring pixels to agree. Peak
 structure is all you should read out of it.
 
-HOW IT REPRODUCES scripts/15's FEATURES
----------------------------------------
-Every statistic in window_stats is a sliding-window reduction, so the whole
+How it reproduces scripts/15's features: every statistic in window_stats is a sliding-window reduction, so the whole
 per-point feature set has an exact whole-tile equivalent in scipy.ndimage:
 
     <band>_point       -> the band array itself
@@ -56,9 +54,7 @@ plausible-looking but wrong surface:
   3. E[x^2] - E[x]^2 cancels catastrophically in float32 on CHM-scale values,
      so the accumulators are float64.
 
-MULTI-DATE SEMANTICS
---------------------
-score_locations_classical picks, per location, the NEWEST covering date whose
+Multi-date semantics: score_locations_classical picks, per location, the NEWEST covering date whose
 pixel is not nodata, takes all spatial features from that one date, and
 computes the temporal-stability columns across EVERY non-nodata date. This
 module reproduces that per pixel, which means the date supplying a pixel's
@@ -73,19 +69,15 @@ Requires the date grids to be pixel-identical; this is asserted per tile
 rather than assumed, and the assertion is the thing to check first if a run
 dies on a new AOI.
 
-TILE OVERLAP AND n_dates_covered
--------------------------------
-That feature does not count dates. build_rows fans a point across every tile
+Tile overlap and n_dates_covered: that feature does not count dates. build_rows fans a point across every tile
 find_covering_tiles returns, and this project's tiles OVERLAP (~12% of a tile
-in lugano_example), so a point in a 4-tile corner covered by 3 dates yields 12.
+in bellinzona_example), so a point in a 4-tile corner covered by 3 dates yields 12.
 dense_coverage_count reproduces that by counting covering non-nodata tile
 instances across the whole tile set, including neighbouring cells. Overlapping
 tiles are bit-identical on shared ground, so this multiplicity leaves the
 temporal std/range columns alone and affects only the count.
 
-WHERE THIS DIVERGES FROM THE POINT PATH (inherent, not a defect here)
---------------------------------------------------------------------
-score_locations_classical takes its spatial features from the FIRST covering
+Where this diverges from the point path (inherent, not a defect here): score_locations_classical takes its spatial features from the FIRST covering
 tile in `sorted(covering, key=lambda p: p.parent.name, reverse=True)`. That
 sort orders date directories, but among several tiles of the SAME newest date
 — which overlap here — it is stable, so the winner is whichever find_covering_
@@ -114,9 +106,7 @@ tile boundary. The clean fix, if it ever matters, is to compute features on a
 mosaic of the target tile plus its neighbours and crop back — no internal
 truncation at all, better than either current path.
 
-TEMPORAL STD ESTIMATOR
-----------------------
-scripts/15 previously disagreed with itself: add_temporal_features (training)
+Temporal std estimator: scripts/15 previously disagreed with itself: add_temporal_features (training)
 used pandas .std() = ddof=1, while temporal_features_from_dicts (scoring) used
 np.std() = ddof=0 — a factor of sqrt(2) apart at the two dates most points
 have. scripts/15 now uses ddof=0 on both paths, so a features CSV regenerated
@@ -231,13 +221,13 @@ def dense_coverage_count(
 
     Despite the name, that feature does not count dates. scripts/15's
     build_rows fans a point across every tile returned by find_covering_tiles,
-    and this project's tiles OVERLAP (~12% of a tile's area in lugano_example),
+    and this project's tiles OVERLAP (~12% of a tile's area in bellinzona_example),
     so a point in a 4-tile corner covered by 3 dates yields n_dates_covered=12,
     not 3. Counting only the target cell's dates would hand the model a feature
     in the wrong range — the model was fitted on values up to 12.
 
     Overlapping tiles are bit-identical on shared ground (verified on
-    lugano_example), so this multiplicity does NOT disturb the temporal
+    bellinzona_example), so this multiplicity does NOT disturb the temporal
     std/range columns: replicating every date's value the same number of times
     leaves min, max and the ddof=0 std unchanged. It only affects this count.
     (Under pandas' old ddof=1 it would have perturbed the std too — one more

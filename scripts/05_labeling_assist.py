@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-05_labeling_assist.py
-=====================
-Build a self-contained HTML review sheet to VERIFY occurrence points fast, instead
+"""Build a self-contained HTML review sheet to VERIFY occurrence points fast, instead
 of eyeballing the orthophoto cold.
 
 For each occurrence point it renders one card:
@@ -26,7 +23,7 @@ coordinate-uncertainty alone. Either way, capped at labels.assist_max (default 6
 NDVI is a SCREENING SIGNAL, not a label: a high value only means "plausible
 evergreen vegetation here," not "confirmed palm." Still requires a human look.
 
-STATUS: implemented. Pure review tool — writes no labels itself.
+Pure review tool — writes no labels itself.
 """
 from __future__ import annotations
 
@@ -128,7 +125,7 @@ def main() -> None:
     res_m = cfg["imagery"].get("res_m", 0.10)
     win_m = cfg["labels"].get("assist_window_m", 24)
     cap = cfg["labels"].get("assist_max", 60)
-    rs_dir = Path(cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/lugano_delivery_2026-07"))
+    rs_dir = Path(cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/bellinzona_delivery_2026-07"))
     rs_date = str(cfg["imagery"].get("rs_date", ""))
 
     occ = Path(cfg["paths"]["interim_dir"]) / "labels" / f"{aoi}_occurrences.geojson"

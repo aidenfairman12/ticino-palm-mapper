@@ -2,9 +2,9 @@
 # Start SMALL — one municipality — before scaling to the canton.
 
 aoi:
-  name: "lugano_example"
+  name: "bellinzona_example"
   # Bounding box in EPSG:2056 (CH1903+ / LV95), in metres.
-  # SANITY-CHECK box near Lugano (southern Ticino): ~500 x 500 m. Picked because
+  # SANITY-CHECK box near Bellinzona (southern Ticino): ~500 x 500 m. Picked because
   # GBIF has a dense cluster of Trachycarpus fortunei occurrences here (~68 points),
   # so the first run produces tiles with palms you can actually eyeball. Scale up to
   # the municipality once alignment looks right.
@@ -48,7 +48,7 @@ labels:
   assist_window_m: 24        # ortho crop size (m) per card
   # candidate prioritization (script 06)
   near_road_m: 25             # distance (m) to nearest OSM road counted as "Street-View-likely"
-  rs_dir: "data/raw/swissimage_rs/lugano_delivery_2026-07"  # delivered NIR tiles
+  rs_dir: "data/raw/swissimage_rs/bellinzona_delivery_2026-07"  # delivered NIR tiles
 
 paths:
   raw_dir: "data/raw"

@@ -1,6 +1,6 @@
 {
 "type": "FeatureCollection",
-"name": "lugano_example_confirmed_palms",
+"name": "bellinzona_example_confirmed_palms",
 "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::2056" } },
 "features": [
 { "type": "Feature", "properties": { "id": "palm_1", "x": 2718329.3473819224, "y": 1115252.1581521283, "source": "triangulated", "crossing_angle_deg": 80.0, "agreement_with_estimate_m": 2.4, "note": "", "ndvi_at_point": 0.37, "ndvi_near_3m": 0.31, "ndvi_background": 0.21, "ndvi_contrast": 0.1, "ndvi_signal": "weak", "ndvi_near_v2": 0.57, "ndvi_bg_v2": 0.42, "ndvi_contrast_v2": 0.15, "ndvi_signal_v2": "distinct", "bg_clean_pixels_v2": 88728 }, "geometry": { "type": "Point", "coordinates": [ 2718329.347381922416389, 1115252.158152128336951 ] } },

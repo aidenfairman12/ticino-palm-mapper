@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-20_check_acquisition_sharpness.py
-==================================
-Quantify apparent RGB sharpness per acquisition date, across the SAME grid
+"""Quantify apparent RGB sharpness per acquisition date, across the SAME grid
 cells in every date, to check whether "March looks sharper than leaf-on"
 (observed by eye in scripts/18's grid output) is a consistent, real
 difference between flights, or just a couple of unlucky tiles.

@@ -1,39 +1,19 @@
 #!/usr/bin/env python
-"""
-07_build_nir_stack.py
-======================
-For every tile in the RGB feature stack (03_build_feature_stack.py), add a
-co-registered NIR channel + NDVI from the delivered SWISSIMAGE RS tiles, where
-coverage exists. Writes a separate RS-native stack:
+"""Fuse the paid SWISSIMAGE RS delivery's NIR/R/G/B into the [R,G,B,CHM] stack
+from 03_build_feature_stack.py, producing [NIR,R,G,B,NDVI,CHM] (6 bands,
+float32) per tile wherever RS coverage exists.
 
-    [NIR, R, G, B, NDVI, CHM]   (6 bands, float32)
+R/G/B here come from the RS delivery itself, not the free dop10 product used
+in 03: NIR/R/G/B need to be one radiometrically consistent acquisition, or
+NDVI mixes real ground change with cross-flight sensor differences. CHM is
+carried over unchanged from 03's output, since LiDAR height is stable
+year-to-year. Tiles with no RS coverage are skipped and reported, not padded
+with fake data — the gap is itself information.
 
-Design choice: R/G/B here come from the RS delivery itself, NOT the free
-SWISSIMAGE dop10 product used in 03. They're one coherent acquisition (same
-sensor pass), so NIR/R/G/B are radiometrically consistent with each other —
-mixing NIR from one flight with RGB from a different year's flight would
-confound the NDVI signal with real ground change. CHM is carried over from the
-existing [R,G,B,CHM] stack (03's output) since LiDAR height is comparatively
-stable year-to-year.
-
-Coverage is real but partial: the free RGB/CHM stack covers the whole canton,
-the RS delivery covers only what was ordered. Tiles with no RS coverage are
-skipped (reported), not padded with fake data — the gap is itself information.
-
-Config:
-  labels.rs_dir     - directory of delivered RS tiles (default in aoi_example.yaml)
-  imagery.rs_date    - which acquisition date to use (default: the leaf-off
-                        date, since evergreen/deciduous contrast is the reason
-                        NIR was requested). Falls back to whatever's available
-                        if unset. Override per-run with --rs-date without
-                        editing the config, e.g. to build a second, more
-                        recent-dated stack for temporal cross-checking against
-                        newer labels — output lands in a date-specific
-                        feature_stack_rs_<date>/ dir either way, so multiple
-                        runs against the same config don't clobber each other.
-
-STATUS: implemented and tested against the lugano_example AOI (36/36 tiles
-had coverage from the 2021-03-24 leaf-off delivery).
+imagery.rs_date defaults to the leaf-off acquisition (the reason NIR was
+requested in the first place); override per-run with --rs-date to build a
+second, differently-dated stack without touching the config — each date
+writes to its own feature_stack_rs_<date>/ dir.
 """
 from __future__ import annotations
 
@@ -75,7 +55,7 @@ def main() -> None:
     import rasterio
 
     aoi = cfg["aoi"]["name"]
-    rs_dir = Path(cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/lugano_delivery_2026-07"))
+    rs_dir = Path(cfg["labels"].get("rs_dir", "data/raw/swissimage_rs/bellinzona_delivery_2026-07"))
     fs_dir = Path(cfg["paths"]["processed_dir"]) / aoi / "feature_stack"
 
     if not rs_dir.exists():

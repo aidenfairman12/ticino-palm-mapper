@@ -1,15 +1,12 @@
 #!/usr/bin/env python
-"""
-08_export_kml.py
-=================
-Export a KML overlay for visually scanning the AOI in Google Earth, instead of
+"""Export a KML overlay for visually scanning the AOI in Google Earth, instead of
 clicking through Street View candidates one at a time.
 
 Three layers:
   - Tile boundaries, color-coded: GREEN = already has a confirmed "distinct"
     palm, YELLOW = has one or more un-reviewed raw GBIF candidate points
     inside it, GRAY = neither.
-  - Confirmed points (lugano_MASTER_confirmed_palms.geojson), colored by
+  - Confirmed points (bellinzona_MASTER_confirmed_palms.geojson), colored by
     ndvi_signal_current: green=distinct, yellow=weak, red=none.
   - Un-reviewed raw GBIF occurrence points (blue) — candidates worth checking.
 
@@ -18,7 +15,7 @@ around, cross-reference the tile grid against the real satellite imagery, and
 note new palm locations directly — no Street View driving required, same
 "satellite landmark matching" method already used for batches 2-4.
 
-STATUS: implemented. Read-only — writes no labels itself.
+Read-only — writes no labels itself.
 """
 from __future__ import annotations
 
@@ -72,7 +69,7 @@ def main() -> None:
     if not tile_paths:
         raise SystemExit(f"No tiles found in {tile_dir} — run 03_build_feature_stack.py first")
 
-    master_path = Path(cfg["paths"]["interim_dir"]) / "labels" / "lugano_MASTER_confirmed_palms.geojson"
+    master_path = Path(cfg["paths"]["interim_dir"]) / "labels" / "bellinzona_MASTER_confirmed_palms.geojson"
     occ_path = Path(cfg["paths"]["interim_dir"]) / "labels" / f"{aoi}_occurrences.geojson"
 
     confirmed = gpd.read_file(master_path).to_crs(PROJECT_CRS) if master_path.exists() else None

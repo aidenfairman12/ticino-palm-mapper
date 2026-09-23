@@ -49,7 +49,7 @@ class PalmSSLDataset(Dataset):
     
     
 if __name__ == "__main__":
-    tile_dir = Path("data/processed/lugano_example/feature_stack")
+    tile_dir = Path("data/processed/bellinzona_example/feature_stack")
     tile_paths = list(tile_dir.glob("*_rgbchm.tif"))
 
     train, val, test = spatial_split(tile_paths, val_frac=0.15, test_frac=0.15, block_size_m=150, seed=42)

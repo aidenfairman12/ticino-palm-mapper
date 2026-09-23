@@ -60,7 +60,7 @@ tunnel.log
 # dense per-pixel score rasters (dense_classical.py). Regenerate from the
 # tracked label data + tile dirs; one classical_features_* variant already
 # got close to GitHub's 100MB file size limit.
-classical_features*.csv
+classical_features/*.csv
 dense_scores*/
 output_dir/
 sharpness_examples/

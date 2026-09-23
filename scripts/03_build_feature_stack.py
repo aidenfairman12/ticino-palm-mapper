@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-03_build_feature_stack.py
-=========================
-For every RGB tile produced by `00_fetch_swissimage.py`, co-register a LiDAR
+"""For every RGB tile produced by `00_fetch_swissimage.py`, co-register a LiDAR
 canopy-height channel and write a 4-band feature stack: [R, G, B, CHM].
 
   CHM (canopy height model) = DSM - DTM
@@ -28,7 +25,7 @@ WHY (see feasibility notes): RGB alone can't reliably separate palms from other
 crowns at 10 cm; height masks lawn/ground and separates understory palms from tall
 canopy. Height is a feature, not a stand-alone discriminator — fuse it in the model.
 
-STATUS: implemented. NIR would be the natural 5th channel but SWISSIMAGE RS is not
+NIR would be the natural 5th channel but SWISSIMAGE RS is not
 freely served (request/paid), so it's omitted here.
 """
 from __future__ import annotations

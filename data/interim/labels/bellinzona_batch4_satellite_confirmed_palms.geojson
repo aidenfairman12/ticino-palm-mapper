@@ -1,6 +1,6 @@
 {
 "type": "FeatureCollection",
-"name": "lugano_batch4_satellite_confirmed_palms",
+"name": "bellinzona_batch4_satellite_confirmed_palms",
 "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::2056" } },
 "features": [
 { "type": "Feature", "properties": { "id": "batch4_r1", "x": 2720231.5614099638, "y": 1115320.5649414323, "lat": 46.178620221967364, "lon": 8.9957239872051868, "note": "3 trunks within ~30cm of each other, produces ONE merged canopy", "rs_dates_available": "20210811,20220715,20240821", "source": "satellite_landmark_match", "ndvi_near_v2": 0.18, "ndvi_bg_v2": 0.14, "ndvi_contrast_v2": 0.04, "ndvi_signal_v2": "weak" }, "geometry": { "type": "Point", "coordinates": [ 2720231.561409963760525, 1115320.564941432327032 ] } },

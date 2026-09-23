@@ -16,7 +16,7 @@
 
 ### The species
 - *Trachycarpus fortunei* ("Chinese windmill palm", locally "Tessinerpalme") was introduced as an ornamental in the 19th century and has become **aggressively invasive in southern Ticino** over recent decades, displacing native species and inhibiting forest regeneration.
-- It thrives in the warm, humid Insubric climate of southern Ticino (Lugano, Locarno, Mendrisiotto) — the same low-elevation valley terrain that gets the highest-resolution aerial imagery.
+- It thrives in the warm, humid Insubric climate of southern Ticino (Bellinzona, Locarno, Mendrisiotto) — the same low-elevation valley terrain that gets the highest-resolution aerial imagery.
 - Morphology relevant to detection: single trunk, **2–10 m tall**, crown of **fan-shaped (palmate) fronds ~60–100 cm long**, forming a distinctive radial "pinwheel/star" rosette **~1.5–3 m across**. Juveniles are trunkless rosettes closer to the ground.
 
 ### Why it's portfolio-worthy *and* paper-able
@@ -130,7 +130,7 @@ Goal: as little manual annotation as possible while keeping the eval honest.
 > Designed to de-risk early (prove signal before investing in SSL) and to have a paper-able endpoint.
 
 ### Phase 0 — Data pipeline *(start here; mostly engineering)*
-- Define a southern-Ticino bounding box (start small — e.g. one municipality around Lugano/Mendrisio).
+- Define a southern-Ticino bounding box (start small — e.g. one municipality around Bellinzona/Mendrisio).
 - Fetch SWISSIMAGE 10 cm tiles (Earth Engine export **or** swisstopo COG download).
 - Ingest Info Flora occurrence points; reproject to EPSG:2056.
 - Build tiling + label-alignment workflow (rasterize points onto tile grid).

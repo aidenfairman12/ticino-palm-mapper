@@ -10,6 +10,12 @@
 #SBATCH --output=logs/data_pipeline/bellinzona-pipeline-%j.out
 #SBATCH --error=logs/data_pipeline/bellinzona-pipeline-%j.err
 
+# Superseded: this Apptainer-based 00->01->02->03->07 chain predates the
+# manual-review labeling workflow (scripts/06, 25) and was never re-run for
+# the live bellinzona_full_nir AOI. Current jobs (e.g. build_10cm_nir_stacks.sbatch)
+# run 00->03->07 directly via `module load`, skipping 01/02 entirely. Kept for
+# reference, not part of the current pipeline.
+#
 # Run from the repo root: sbatch slurm/process_bellinzona.sbatch
 # Assumes ticino-palm.sif has already been built via:
 #   apptainer build --fakeroot ticino-palm.sif apptainer.def

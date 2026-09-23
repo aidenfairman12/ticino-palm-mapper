@@ -1,6 +1,6 @@
 {
   "type": "FeatureCollection",
-  "name": "lugano_MASTER_confirmed_palms",
+  "name": "bellinzona_MASTER_confirmed_palms",
   "crs": {
     "type": "name",
     "properties": {
@@ -12,7 +12,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p1",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.36,
         "ndvi_bg_v2": 0.51,
@@ -40,7 +40,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p2",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.53,
         "ndvi_bg_v2": 0.59,
@@ -68,7 +68,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p3",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.43,
         "ndvi_bg_v2": 0.16,
@@ -96,7 +96,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p4",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.52,
         "ndvi_bg_v2": 0.05,
@@ -124,7 +124,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p5",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.28,
         "ndvi_bg_v2": 0.07,
@@ -152,7 +152,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p6",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.17,
         "ndvi_bg_v2": 0.21,
@@ -180,7 +180,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p7",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.09,
         "ndvi_bg_v2": 0.26,
@@ -208,7 +208,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p8",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.25,
         "ndvi_bg_v2": 0.08,
@@ -236,7 +236,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p9",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.34,
         "ndvi_bg_v2": 0.04,
@@ -264,7 +264,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p10",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.31,
         "ndvi_bg_v2": 0.08,
@@ -292,7 +292,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p11",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.42,
         "ndvi_bg_v2": 0.33,
@@ -320,7 +320,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p12",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.54,
         "ndvi_bg_v2": 0.21,
@@ -348,7 +348,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p13",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.34,
         "ndvi_bg_v2": 0.07,
@@ -376,7 +376,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch2_p14",
-        "batch_file": "lugano_batch2_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch2_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.43,
         "ndvi_bg_v2": 0.07,
@@ -404,7 +404,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q1",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.19,
         "ndvi_bg_v2": -0.02,
@@ -432,7 +432,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q2",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.28,
         "ndvi_bg_v2": -0.0,
@@ -460,7 +460,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q3",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.31,
         "ndvi_bg_v2": 0.15,
@@ -488,7 +488,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q4",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.3,
         "ndvi_bg_v2": 0.34,
@@ -516,7 +516,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q5",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.34,
         "ndvi_bg_v2": 0.36,
@@ -544,7 +544,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q6",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.3,
         "ndvi_bg_v2": 0.36,
@@ -572,7 +572,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q7",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.33,
         "ndvi_bg_v2": 0.12,
@@ -600,7 +600,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q8",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.19,
         "ndvi_bg_v2": 0.08,
@@ -628,7 +628,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q9",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.5,
         "ndvi_bg_v2": 0.14,
@@ -656,7 +656,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch3_q10",
-        "batch_file": "lugano_batch3_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch3_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.36,
         "ndvi_bg_v2": 0.12,
@@ -684,7 +684,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch4_r1",
-        "batch_file": "lugano_batch4_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch4_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.18,
         "ndvi_bg_v2": 0.14,
@@ -712,7 +712,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch4_r2",
-        "batch_file": "lugano_batch4_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch4_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.46,
         "ndvi_bg_v2": 0.27,
@@ -740,7 +740,7 @@
       "type": "Feature",
       "properties": {
         "id": "batch4_r3",
-        "batch_file": "lugano_batch4_satellite_confirmed_palms.geojson",
+        "batch_file": "bellinzona_batch4_satellite_confirmed_palms.geojson",
         "source": "satellite_landmark_match",
         "ndvi_near_v2": 0.33,
         "ndvi_bg_v2": 0.32,
@@ -768,7 +768,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_1",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.57,
         "ndvi_bg_v2": 0.42,
@@ -796,7 +796,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_2",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.3,
         "ndvi_bg_v2": 0.21,
@@ -824,7 +824,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_3a",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.38,
         "ndvi_bg_v2": 0.17,
@@ -852,7 +852,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_3b",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.47,
         "ndvi_bg_v2": 0.19,
@@ -880,7 +880,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_4",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.22,
         "ndvi_bg_v2": 0.19,
@@ -908,7 +908,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_5",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.44,
         "ndvi_bg_v2": 0.15,
@@ -936,7 +936,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_6",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.28,
         "ndvi_bg_v2": 0.6,
@@ -964,7 +964,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_7",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.33,
         "ndvi_bg_v2": 0.27,
@@ -992,7 +992,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_8",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.24,
         "ndvi_bg_v2": 0.14,
@@ -1020,7 +1020,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_9",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "triangulated",
         "ndvi_near_v2": 0.16,
         "ndvi_bg_v2": 0.18,
@@ -1048,7 +1048,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_X",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "estimate_only",
         "ndvi_near_v2": 0.6,
         "ndvi_bg_v2": 0.63,
@@ -1076,7 +1076,7 @@
       "type": "Feature",
       "properties": {
         "id": "palm_Y",
-        "batch_file": "lugano_example_confirmed_palms.geojson",
+        "batch_file": "bellinzona_example_confirmed_palms.geojson",
         "source": "estimate_only",
         "ndvi_near_v2": 0.66,
         "ndvi_bg_v2": 0.62,

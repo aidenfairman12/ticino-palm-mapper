@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-"""
-12_score_summary.py
-===================
-Summary statistics for a score_candidates.py output file — how many
+"""Summary statistics for a score_candidates.py output file — how many
 locations were scored, the shape of the predicted_prob distribution, and
 how many fall in each confidence band. Meant as a quick sanity check after
 a scoring run finishes, especially a large/expensive full-grid pass, before
@@ -12,8 +9,6 @@ diving into the per-card review.
 threshold output, not a confirmed palm. Confirming still requires manual
 review (10_review_candidates.py -> 11_merge_review_verdicts.py); this
 script is purely descriptive of what the model produced.
-
-STATUS: implemented.
 """
 from __future__ import annotations
 
