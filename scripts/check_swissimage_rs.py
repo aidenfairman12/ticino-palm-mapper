@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-check_rs.py — inspect the delivered SWISSIMAGE RS sample tiles.
+Inspect the delivered SWISSIMAGE RS sample tiles.
 
 NB: do NOT name this file inspect.py / any stdlib module name. A local file that
 shadows a stdlib module (e.g. inspect.py) is put first on sys.path and breaks the

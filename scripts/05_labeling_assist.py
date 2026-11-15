@@ -11,8 +11,8 @@ For each occurrence point it renders one card:
   - a Google satellite link and a swisstopo map.geo.admin.ch link (both at the point).
 
 Open the resulting index.html and click through: Street View confirms species, the
-crops show the from-above signature. This is the workflow we used to confirm a palm
-at Parco giochi Usignolo — it's how you build an HONEST, ground-truthed test set
+crops show the from-above signature. This workflow was used to confirm the first palm
+(Parco giochi Usignolo) and is the basis for a ground-truthed test set
 (occurrence-point coordinates alone are unreliable; some land on rooftops).
 
 Card ORDER: if 06_prioritize_labels.py has been run, its ranked shortlist

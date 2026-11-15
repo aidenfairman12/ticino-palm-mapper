@@ -7,7 +7,7 @@ sparse set of grid LOCATIONS — one feature vector per location. That answers
 "is there a palm here?" but cannot answer "how many palms are in this blob?",
 because there is no surface to find peaks in. This module evaluates the SAME
 trained model at every pixel of a tile, producing a continuous probability
-surface you can open in QGIS on top of the confirmed-palm points and look at.
+surface that can be overlaid in QGIS on the confirmed-palm points.
 
 The immediate question it exists to answer: at a known multi-palm cluster
 (c010_r060 holds a group of 6; c057_r040 holds a 3 and a 2; c061_r038 holds
@@ -18,8 +18,8 @@ the exhaustive annotation it would require.
 
 NOT a density map: these are per-pixel probabilities from a model trained on
 point labels. They carry no count semantics — the surface does not integrate
-to a palm count, and nothing constrains neighbouring pixels to agree. Peak
-structure is all you should read out of it.
+to a palm count, and nothing constrains neighbouring pixels to agree. Only the
+peak structure is meaningful.
 
 How it reproduces scripts/15's features: every statistic in window_stats is a sliding-window reduction, so the whole
 per-point feature set has an exact whole-tile equivalent in scipy.ndimage:

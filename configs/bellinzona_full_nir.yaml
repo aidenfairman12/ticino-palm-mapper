@@ -1,6 +1,6 @@
 # Area-of-interest and run configuration — FULL NIR FOOTPRINT.
 #
-# aoi_example.yaml's tiny 500x500m box was a sanity-check convenience for the
+# aoi_example.yaml's tiny 500x500m box was a small validation area for the
 # first pipeline run, not a real dataset. This config instead covers the
 # ENTIRE delivered SWISSIMAGE RS (NIR) footprint — 25 strips, ~62 km^2 — since
 # NIR/CHM fusion is central to the approach and RGB-only imagery outside this

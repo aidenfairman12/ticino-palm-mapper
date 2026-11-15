@@ -1,17 +1,16 @@
 """Import a Google Earth visual-review pass over the native-10cm footprint
-KML (scripts/24's output). The user adds placemarks in Earth under 'palms'
+KML (scripts/24's output). The reviewer adds placemarks in Earth under 'palms'
 and 'negatives' folders (and may delete some of the original root-level
 confirmed-palm placemarks they decide are wrong on closer look), then
-re-exports the whole project as KML. This is re-run every time the user does
-another pass and re-exports.
+re-exports the whole project as KML. This is re-run after each review pass.
 
 Root-level placemarks (no folder) are always the ORIGINAL confirmed-palm
-points scripts/24 wrote in — this only works because the user doesn't move
+points scripts/24 wrote in — this only works because the reviewer never moves
 anything out of the root level into a folder; if they had, this diffing
 approach would misattribute it.
 
 Handles repeat passes over the SAME project (the KML keeps growing as the
-user adds more): loads every already-imported batch's points
+reviewer adds more): loads every already-imported batch's points
 (google_earth_review_batch*_confirmed_palms.geojson /
 ..._hard_negatives.geojson) and skips anything within ~1m of a point already
 imported, so re-running after another editing pass only writes the NEW
@@ -158,7 +157,7 @@ def main() -> None:
         print(f"  {m['file']} :: {m['pid']}  (x={m['x']}, y={m['y']})")
 
     # also check whether any PREVIOUSLY-IMPORTED batch point (in the 'palms'/'negatives'
-    # folders, not root) is missing from this new export -- e.g. the user deleted one
+    # folders, not root) is missing from this new export -- e.g. the reviewer deleted one
     # they'd added in an earlier pass.
     def missing_from_kml(prior_lonlat, kml_folder_points, kind):
         kml_set = kml_folder_points

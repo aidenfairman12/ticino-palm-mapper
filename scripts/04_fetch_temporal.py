@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Fetch SWISSIMAGE RGB tiles for the AOI across MULTIPLE vintages, into per-year
-folders, so you get a co-registered time series for change / persistence features.
+folders, producing a co-registered time series for change / persistence features.
 
   interim/tiles/<aoi>/<year>/<aoi>_<year>_cCCC_rRRR.tif
 
@@ -9,7 +9,7 @@ Because every year is tiled with the identical map-coordinate grid
 across years — so stacking <aoi>_2018_c003_r003 / _2021_ / _2024_ gives a temporal
 stack with no extra registration.
 
-WHY (see feasibility notes): an evergreen palm is persistent across vintages while
+Why: an evergreen palm is persistent across vintages while
 deciduous canopy and land-use (e.g. construction) change — temporal persistence is
 one of the few signals that helps separate palms from look-alike crowns. The Bellinzona
 area has 2018 / 2021 / 2024.

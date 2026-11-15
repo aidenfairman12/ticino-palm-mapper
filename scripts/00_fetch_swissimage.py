@@ -17,7 +17,7 @@ Two routes (set `imagery.source` in the config):
 Confirmed live (2026-06): STAC v1, collection ch.swisstopo.swissimage-dop10, each
 item a 1 km² tile with a "_0.1_2056.tif" 10 cm COG already in EPSG:2056. Coverage
 is flown on a ~3-year cycle, so not every year exists for every AOI — the script
-lists available years and errors (rather than writing zero tiles) if yours is missing.
+lists available years and errors (rather than writing zero tiles) if the configured year is missing.
 """
 from __future__ import annotations
 

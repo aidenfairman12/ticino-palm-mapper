@@ -2,10 +2,7 @@
 Linear probe: does the SSL-pretrained encoder's features actually separate
 palm crops from non-palm crops?
 
-STUBBED ON PURPOSE — this file is yours to implement. Every function below
-has a docstring describing what it needs to do. No logic is filled in.
-
-This is the "go/no-go" checkpoint discussed at length this session: a small,
+This is the project's go/no-go test for the SSL encoder: a small,
 frozen-encoder classifier trained on a handful of labeled crops
 (PalmSSLDataset for pretraining, PalmProbeDataset for this). Deliberately
 simple relative to pretrain_ssl.py:

@@ -14,14 +14,14 @@ Two routes (set `labels.source` in the config):
              (e.g. the official Info Flora point export, once it arrives). Cleaning
              + reprojection logic below handles both formats.
 
-IMPORTANT (see proposal §3): these are PRESENCE-ONLY records — good positive
+IMPORTANT (see docs/DESIGN.md §3): these are PRESENCE-ONLY records — good positive
 anchors, NOT complete labels and NOT crown outlines. Absence of a point does not
-mean absence of a palm. For honest evaluation you still need a small, EXHAUSTIVELY
+mean absence of a palm. Reliable evaluation still requires a small, exhaustively
 hand-labelled held-out test set.
 
 NOTE on the earlier "AtlasWS_*.csv" export: that was a Welten-Sutter species
 *checklist* for a mapping square (one row per species, NO coordinates) — it cannot
-place point labels. The export you want is one row per *observation* with X/Y. The
+place point labels. The usable export is one row per *observation* with X/Y. The
 GBIF route below produces exactly that.
 
 Superseded for the live bellinzona_full_nir AOI: this only ever ran against the

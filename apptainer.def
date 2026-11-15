@@ -6,7 +6,7 @@ From: condaforge/miniforge3:latest
 
 %post
     # Build the geospatial + ML env from environment.yml via conda-forge —
-    # rasterio/geopandas/fiona/gdal are notoriously painful to get right via
+    # rasterio/geopandas/fiona/gdal are difficult to install reliably via
     # plain pip due to system-level GDAL/GEOS/PROJ dependencies; conda-forge
     # handles that binary compatibility for us, same as this project's local
     # dev setup (see environment.yml).

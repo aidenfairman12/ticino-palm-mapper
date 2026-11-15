@@ -13,11 +13,10 @@
 # Same chain as harvest_pipeline_overnight.sbatch, re-run with the two Google
 # Earth visual-review batches added: 115 hand-picked vegetation negatives
 # from residential/garden terrain (the kind of ground the March-only
-# deciduous harvest structurally could never reach — see
-# checkpoint-2026-09-18-labeling-ceiling.md's 2026-09-20 update, a decisive
-# null result that root-caused the harvest's failure to March's coverage
-# gap), plus 49 new confirmed palms. This is the actual test of the original
-# hypothesis in dense-scoring-reveals-vegetation-detector.md: the model never
+# deciduous harvest structurally could never reach: March coverage misses
+# all three validation tiles, which explains the harvest's null result --
+# see scripts/22), plus 49 new confirmed palms. This is the direct test of
+# the original hypothesis from dense scoring: the model never
 # learned palm-vs-tree because its negatives contained almost no other real
 # trees. The harvest alone didn't fix it because it drew negatives from the
 # wrong part of the map; these do not have that problem.

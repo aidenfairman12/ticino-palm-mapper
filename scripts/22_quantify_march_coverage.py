@@ -2,9 +2,9 @@
 inside vs outside the March 2021 (leaf-off) delivery's footprint.
 
 Context: scripts/19's deciduous-negative harvest only draws from inside the
-March footprint. checkpoint-2026-09-18-labeling-ceiling.md (memory) found
-that all three validation tiles have ZERO March coverage and that March
-covers only 8/96 palms in an earlier, partial count. This script re-checks
+March footprint. An earlier spot check found that all three validation
+tiles have ZERO March coverage and that March covers only 8/96 palms in a
+partial count. This script re-checks
 that against the FULL confirmed+scouted population using every points file
 in data/interim/labels/, not just the leaf-on-set sample used earlier.
 

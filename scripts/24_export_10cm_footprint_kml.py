@@ -1,7 +1,6 @@
 """Export a KML of the three NATIVE-10cm-resolution acquisition dates'
-footprints (2021-03-24, 2024-07-20, 2024-08-10 — see
-checkpoint-2026-09-18-labeling-ceiling.md's 2026-09-21 update for how these
-were identified: the other three dates in the delivery are native 25cm,
+footprints (2021-03-24, 2024-07-20, 2024-08-10 — identified
+via the sharpness checks in scripts/20 and 23: the other three dates in the delivery are native 25cm,
 upsampled to look like 10cm by the existing pipeline, and not directly
 comparable), plus every confirmed palm point, so the actual candidate AOI can
 be scouted in Google Earth for palm presence before committing to it.

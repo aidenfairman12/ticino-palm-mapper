@@ -12,8 +12,7 @@
 
 # Two ablations on top of the native_10cm_baseline.sbatch run, isolating
 # which part of the CHM feature set (if any) was responsible for the
-# chm_local_roughness_r1.0-driven accuracy jump seen in that baseline
-# (2026-09-23 conversation):
+# chm_local_roughness_r1.0-driven accuracy jump seen in that baseline:
 #   A) drop all r=1.0-radius CHM features + chm_point (untrustworthy per-window
 #      sample count at that radius, independent of RGB/NIR/NDVI resolution)
 #   B) drop the 5 CHM shape descriptors (peak_ratio/skew/kurtosis/

@@ -25,7 +25,7 @@
 # completely empty log (stdout wasn't flushed) — this sbatch now has a 6h
 # limit for real headroom, and scripts/16 itself writes its progress CSV
 # incrementally and flushes every print, so even an unexpected kill won't
-# lose everything the way it did last time.
+# lose all progress.
 #
 # Run from the repo root: sbatch slurm/tune_classical_model_rf.sbatch
 mkdir -p logs/classical_tune

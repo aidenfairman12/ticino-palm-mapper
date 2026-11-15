@@ -14,8 +14,8 @@
 # harvest dropped) -- the only difference is scripts/15 itself now also
 # computes CHM shape descriptors (chm_peak_ratio, chm_skew, chm_kurtosis,
 # chm_local_roughness, chm_asymmetry, chm_window_clipped) per radius, so
-# re-running the same config picks up the new columns. Note the caveat
-# from the 2026-09-22 conversation: the underlying CHM is swisstopo's
+# re-running the same config picks up the new columns. Caveat:
+# the underlying CHM is swisstopo's
 # 0.5m-native DSM-DTM product resampled onto this project's 0.1m grid, so
 # the r=1.0 versions of these shape features may mostly reflect resampling
 # smoothness rather than real crown micro-structure -- watch feature
@@ -29,7 +29,7 @@
 # negatives goes from ~1:40 (dominated by the unverified, geographically-
 # biased harvest) to roughly 1:1 (356 : ~319+30 baseline-random).
 #
-# This tests the hypothesis from the 2026-09-22 conversation directly: was
+# Hypothesis under test: was
 # the harvest run's weak improvement (saturation dropped a little, precision
 # barely moved) because 115 real negatives were too diluted by 13,746
 # untrusted ones to matter, or because real negatives near-1:1 still aren't

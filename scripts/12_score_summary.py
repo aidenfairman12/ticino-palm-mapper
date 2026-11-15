@@ -58,8 +58,8 @@ def main() -> None:
     print()
 
     # Very-high-confidence tail is usually the most informative slice for a
-    # first review pass — surface it explicitly rather than making the user
-    # read it off the histogram.
+    # first review pass — surface it explicitly rather than leaving it to be
+    # read off the histogram.
     for threshold in (0.9, 0.95, 0.99):
         n_above = int((probs > threshold).sum())
         print(f"predicted_prob > {threshold}: {n_above} location(s)")

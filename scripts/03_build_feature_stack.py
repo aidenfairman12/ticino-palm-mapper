@@ -13,20 +13,19 @@ alignment step) and DIFFERENCED there, then the resulting CHM is resampled
 not resampled-then-subtracted, which would independently interpolate two
 correlated surfaces before differencing them, amplifying interpolation noise
 right at height-discontinuity edges (see resample_array_to's docstring).
-Output is float32 GeoTIFF (R,G,B in 0-255, CHM in metres) — your Dataset
-reads it as a (4,H,W) array and normalises however you like.
+Output is float32 GeoTIFF (R,G,B in 0-255, CHM in metres) — read as a
+(4,H,W) array; normalisation happens downstream.
 
 NOTE: DSM/DTM's true native resolution is 0.5 m regardless of this fix — CHM
 shape/texture features computed at a finer radius than that (e.g. 1m) are
-measuring resampling smoothness, not real structure. See
-checkpoint-2026-09-18-labeling-ceiling.md's 2026-09-22 update.
+measuring resampling smoothness, not real structure.
 
-WHY (see feasibility notes): RGB alone can't reliably separate palms from other
+Why: RGB alone can't reliably separate palms from other
 crowns at 10 cm; height masks lawn/ground and separates understory palms from tall
 canopy. Height is a feature, not a stand-alone discriminator — fuse it in the model.
 
-NIR would be the natural 5th channel but SWISSIMAGE RS is not
-freely served (request/paid), so it's omitted here.
+NIR is added separately by 07_build_nir_stack.py where SWISSIMAGE RS coverage
+exists (it is not freely served, so this stack is RGB+CHM only).
 """
 from __future__ import annotations
 

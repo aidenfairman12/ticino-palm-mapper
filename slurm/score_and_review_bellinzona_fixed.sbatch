@@ -13,8 +13,7 @@
 
 # Full/near-full systematic grid scoring pass + one review page, using
 # checkpoints/dinov2_mae_fixed/checkpoint_best.pt (continued-MAE-pretrained,
-# channel-alignment fix applied — see commit fcad6ce and
-# adapt_patch_embed-channel-misalignment-bug project memory).
+# channel-alignment fix applied — see commit fcad6ce).
 #
 # Chosen over dinov2_vanilla_fixed for this batch specifically: linear-probe
 # CV on the *_fixed checkpoints shows dinov2_vanilla_fixed wins pooled
@@ -22,9 +21,7 @@
 # residential/garden folds (84% vs 66%) that originally motivated the
 # channel-alignment fix — i.e. it catches more true palms in exactly the
 # settings the fix was meant to help, at the cost of more false positives to
-# sift through in review. See mae-continued-pretraining-hurts-linear-probe /
-# adapt-patch-embed-channel-misalignment-bug project memory for the full
-# per-fold breakdown.
+# sift through in review.
 #
 # OUTPUT is a NEW path — score_candidates.py's resume-from-output logic
 # tracks "already scored" purely by (x, y) coordinates with no awareness of

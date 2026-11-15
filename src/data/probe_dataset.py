@@ -1,16 +1,13 @@
 """
 Point-centered crop dataset for the downstream linear-probe evaluation.
 
-STUBBED ON PURPOSE — this file is yours to implement. Every function/method
-below has a docstring describing what it needs to do. No logic is filled in.
-
 This is a different cropping strategy from PalmSSLDataset (which takes a
 random crop anywhere in a tile, for unsupervised pretraining). Here, every
 crop must be centered on a specific labeled point — positive (confirmed
 palm) or negative (confirmed/assumed non-palm) — so the linear probe has a
 meaningful (crop, label) pair to train and evaluate on.
 
-Design decisions made this session, worth keeping in mind:
+Design decisions:
   - A single point may fall inside more than one tile if multiple NIR-date
     stacks cover that location (e.g. both feature_stack_rs_20210811 and
     feature_stack_rs_20240821). Rather than picking just one, EACH covering
@@ -18,8 +15,8 @@ Design decisions made this session, worth keeping in mind:
     training/eval diversity for a label-starved dataset, not a conflict to
     resolve down to one choice.
   - Positives: the "distinct"-signal points from the MASTER confirmed file
-    (load_confirmed_points in src/data/dataset.py), plus your scouted
-    candidates once you've decided how much to trust each confidence tier.
+    (load_confirmed_points in src/data/dataset.py), optionally augmented
+    with scouted candidates and active-learning-confirmed points.
   - Negatives: locations with NO confirmed/candidate point nearby — see
     sample_negative_points below. Must not accidentally sample from an
     unreviewed GBIF occurrence point's location (could be a true positive
@@ -184,14 +181,3 @@ class PalmProbeDataset(Dataset):
         label_tensor = torch.tensor(label, dtype=torch.float32)
         
         return (image_tensor, label_tensor)
-        
-        
-if __name__ == "__main__":
-    # Sanity-check scaffold — fill in once the pieces above work. Suggested
-    # first check: build the dataset over a small tile subset + your
-    # confirmed points, print len(dataset), and pull one positive and one
-    # negative example to confirm shapes/labels look right, e.g.:
-    #
-    #   x_pos, y_pos = next((x, y) for x, y in dataset if y.item() == 1.0)
-    #   print(x_pos.shape, y_pos.item())
-    pass

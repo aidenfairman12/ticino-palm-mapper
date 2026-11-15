@@ -285,9 +285,8 @@ class MaskedAutoencoder(nn.Module):
 
 
 if __name__ == "__main__":
-    # Sanity-check scaffold: build the model, run one random batch through
-    # it, and confirm loss/pred/mask shapes make sense before wiring up a
-    # real training loop.
+    # Smoke test: build the model, run one random batch through it, and
+    # check loss/pred/mask shapes.
     import timm
 
     backbone = timm.create_model("vit_small_patch14_dinov2.lvd142m", pretrained=True)

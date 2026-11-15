@@ -4,9 +4,9 @@
 aoi:
   name: "bellinzona_example"
   # Bounding box in EPSG:2056 (CH1903+ / LV95), in metres.
-  # SANITY-CHECK box near Bellinzona (southern Ticino): ~500 x 500 m. Picked because
+  # Small validation AOI near Bellinzona (southern Ticino): ~500 x 500 m. Chosen because
   # GBIF has a dense cluster of Trachycarpus fortunei occurrences here (~68 points),
-  # so the first run produces tiles with palms you can actually eyeball. Scale up to
+  # so the first run produces tiles containing known palms. Scale up to
   # the municipality once alignment looks right.
   # Order: [xmin, ymin, xmax, ymax]
   bbox_lv95: [2718000, 1115000, 2718500, 1115500]   # ~500 x 500 m palm-dense box
