@@ -3,9 +3,8 @@ Score random locations across the full NIR footprint with a trained
 classical (RF/XGBoost) model on physically-grounded features, surfacing
 candidates for manual review — the classical-features analog of
 score_candidates.py, for the pipeline that outperformed the deep
-ViT+linear-probe approach by ~14 points (see
-classical-model-beats-deep-pipeline project memory: 96.7% pooled accuracy
-vs the deep pipeline's 82.9% best-ever, at a fraction of the compute).
+ViT+linear-probe approach by ~14 points (96.7% pooled leave-one-tile-out
+accuracy vs the deep pipeline's best of 82.9%, at a fraction of the compute).
 
 Deliberately reuses score_candidates.py's hard-won machinery rather than
 reimplementing it — grid generation (generate_grid_points), atomic
@@ -25,7 +24,7 @@ Workflow:
   1. Train ONE production model on ALL of classical_features.csv (no
      held-out fold — this isn't evaluation, it's the classifier actually
      used to score). Hyperparameters default to the winning XGBoost
-     config from the hyperparameter sweep (see module memory above).
+     config from the hyperparameter sweep (see scripts/16_tune_classical_model.py).
   2. Generate the same systematic grid score_candidates.py would, over
      the same --tile-dirs footprint, excluding already-reviewed locations.
   3. For each location: find every covering tile (across all NIR dates),

@@ -2,8 +2,8 @@
 """Visual inspection tool for specific tiles where leave-one-tile-out CV
 showed poor recall on their confirmed positives — renders every known
 positive location within the given tiles as a read-only card (RGB crop +
-what a probe trained on all current labels currently predicts for it), so
-you can look at exactly what the model sees and form a hypothesis about
+what a probe trained on all current labels currently predicts for it), to
+show exactly what the model sees and form a hypothesis about
 why it's missing confirmed palms there (dense mixed canopy? occlusion?
 unusual lighting? a genuinely atypical palm?).
 

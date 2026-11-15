@@ -29,7 +29,7 @@
 # controlled linear-probe comparison to massively outperform the domain-
 # adaptive checkpoints/dinov2_mae checkpoint (90.9% vs 72.8% pooled
 # accuracy, 84.2% vs 48.8% precision, same dataset/architecture/pos_weight).
-# See mae-continued-pretraining-hurts-linear-probe project memory. Also
+# Also
 # confirmed an MLP head (--hidden-dim) doesn't help on this checkpoint —
 # its features are already separable enough that a linear head ties the
 # MLP's result, so production stays on the simpler plain linear probe.
@@ -48,7 +48,7 @@
 # happens and the entire grid gets scored.
 #
 # Run from the repo root: sbatch --dependency=afterany:<prev_jobid> slurm/score_and_review_full.sbatch
-# (see chain submission notes in conversation — first submission needs no --dependency)
+# (the first job in the chain needs no --dependency)
 mkdir -p logs/score_review review/full_dinov2_vanilla
 
 CHECKPOINT="checkpoints/dinov2_vanilla/checkpoint_best.pt"

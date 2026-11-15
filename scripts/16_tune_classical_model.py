@@ -16,8 +16,8 @@ are different statistics, not a 1:1 swap — see classical_probe.py's
 build_model docstring.
 
 For every candidate: run leave_one_tile_out_cv once, record pooled
-accuracy AND the std of per-fold accuracy (the overfitting-instability
-signal from the modeling walkthrough — a config with slightly lower pooled
+accuracy AND the std of per-fold accuracy (a signal of
+overfitting/instability — a config with slightly lower pooled
 accuracy but much tighter fold-to-fold spread is often the more trustworthy
 pick). Rank by pooled accuracy, then for the top N candidates, re-run
 across several different --model-seed values (fold split still fixed) to

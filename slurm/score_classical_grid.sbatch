@@ -13,7 +13,7 @@
 # Full-grid scoring with the classical NDVI/CHM/spectral + XGBoost pipeline
 # (src/inference/score_candidates_classical.py) — the pipeline that beat
 # the deep ViT+linear-probe approach by ~14 points (96.7% vs 82.9% pooled
-# accuracy, see classical-model-beats-deep-pipeline project memory).
+# leave-one-tile-out accuracy).
 #
 # Two steps, two DIFFERENT environments — deliberately:
 #   1. Scoring runs under the module-loaded Python (rasterio + xgboost

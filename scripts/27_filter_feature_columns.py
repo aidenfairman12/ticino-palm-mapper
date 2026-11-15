@@ -1,3 +1,9 @@
+"""Write two feature-subset variants of the native-10cm classical feature table
+for the CHM ablation (slurm/native_10cm_chm_ablation.sbatch):
+  - *_no_chm_r1.csv:   drops chm_point and every r=1.0 m CHM feature (finer than
+                       the 0.5 m LiDAR can support)
+  - *_no_shape.csv:    drops the five CHM crown-shape descriptors at all radii
+"""
 import pandas as pd
 
 def filter_columns(fname: str )-> None:

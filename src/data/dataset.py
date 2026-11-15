@@ -93,11 +93,11 @@ def normalize(array: np.ndarray, stats: ChannelStats) -> np.ndarray:
 def load_confirmed_points(geojson_path: Path) -> gpd.GeoDataFrame:
     """Load the hand-verified ground-truth points for evaluation.
 
-    Returns a GeoDataFrame (geopandas) in EPSG:2056, or convert to whatever
-    structure you want to consume downstream (e.g. a list of (x, y, signal)
-    tuples). Relevant columns: geometry, ndvi_signal_current, source,
-    batch_file. Remember: 13/39 are "none" — decide whether "none" points
-    count as confirmed-negative evaluation examples or get excluded.
+    Returns a GeoDataFrame in EPSG:2056. Relevant columns: geometry,
+    ndvi_signal_current ("distinct" | "weak" | "none"), source, batch_file.
+    Callers use "distinct" points as positives and treat "none" points
+    (inconclusive NIR signal) as exclusion zones for negative sampling,
+    neither positive nor negative.
     """
     gdf = gpd.read_file(geojson_path)
     
@@ -219,14 +219,14 @@ def random_crop(
     return image_crop, target_crop
 
 class PalmTileDataset(Dataset):
-    """Dataset over feature-stack tiles + density targets.
+    """Tile-level dataset with Gaussian density-map targets, intended for a
+    future dense detection head. Not yet implemented and not used by the
+    current pipeline, which uses PalmSSLDataset (pretraining) and
+    PalmProbeDataset (point-centred classification) instead.
 
-    Decide up front (and document your choice here once made):
-      - which stack to use: feature_stack (4ch, canton-wide RGB+CHM) or
-        feature_stack_rs (6ch, NIR-covered subset only) or a merge of both.
-      - which labels to train against: the weak GBIF masks (plentiful, noisy)
-        vs. the 39-point confirmed set (accurate, tiny) — probably weak masks
-        for training, confirmed set held out entirely for evaluation.
+    Planned design: feature_stack_rs (6-channel NIR) tiles, trained on weak
+    GBIF-derived density targets, with the hand-verified confirmed set held
+    out entirely for evaluation.
     """
 
     def __init__(
@@ -236,10 +236,9 @@ class PalmTileDataset(Dataset):
         crop_size: int | None = None,
         augment: bool = False,
     ) -> None:
-        """Store whatever the dataset needs: the tile list, normalization
-        stats, and any config for cropping/augmentation. Don't load tile
-        data here — do that lazily in __getitem__ so multiple DataLoader
-        workers don't duplicate everything in memory upfront.
+        """Planned: store tile paths, normalization stats and crop/augment
+        config; load tiles lazily in __getitem__ so DataLoader workers
+        don't duplicate memory.
         """
         raise NotImplementedError
 
@@ -250,36 +249,13 @@ class PalmTileDataset(Dataset):
         """Load tile `idx`, normalize, build its target, optionally crop/augment,
         and return (image_tensor, target_tensor) as torch.float32 tensors.
 
-        image_tensor shape: (C, H, W). target_tensor shape: (H, W) for a
-        density map, or whatever shape your task formulation needs.
+        image_tensor shape: (C, H, W). target_tensor shape: (H, W) density map.
         """
         raise NotImplementedError
 
 
 if __name__ == "__main__":
-    # Sanity-check scaffold — fill in once the pieces above work.
-    # Suggested first check (see project notes): load ONE tile through the
-    # full pipeline and print shape/dtype/min/max, e.g.:
-    #
-    #   ds = PalmTileDataset(tile_paths=[...], stats=...)
-    #   x, y = ds[0]
-    #   print(x.shape, x.dtype, x.min().item(), x.max().item())
-    #   print(y.shape, y.dtype, y.sum().item())  # sum ~ implied palm count
-    #
-    # Get this boring plumbing verified correct before touching a model.
-    tile_dir = Path("data/processed/bellinzona_example/feature_stack")
-    tile_paths = list(tile_dir.glob("*_rgbchm.tif"))
-    stats = compute_channel_stats(tile_paths)
-    #print(stats.mean, stats.std)
-    
-    some_path = tile_paths[0]
-    #arr, _, _ = load_tile(some_path)    
-    #normed = normalize(arr, stats)
-    #print(normed.min(), normed.max(), normed.mean(axis=(1,2)))
-    
-    #geojson = "data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson"
-    #load_confirmed_points(geojson)
-    
+    # Smoke test: build a density target for the first tile containing a confirmed point.
     points = load_confirmed_points(Path("data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson"))
 
     tile_dir = Path("data/processed/bellinzona_example/feature_stack")

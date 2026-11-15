@@ -18,7 +18,7 @@
 # negatives goes from ~1:40 (dominated by the unverified, geographically-
 # biased harvest) to roughly 1:1 (356 : ~319+30 baseline-random).
 #
-# This tests the hypothesis from the 2026-09-22 conversation directly: was
+# Hypothesis under test: was
 # the harvest run's weak improvement (saturation dropped a little, precision
 # barely moved) because 115 real negatives were too diluted by 13,746
 # untrusted ones to matter, or because real negatives near-1:1 still aren't

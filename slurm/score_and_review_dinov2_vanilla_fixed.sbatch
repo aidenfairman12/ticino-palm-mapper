@@ -14,8 +14,7 @@
 # Full/near-full systematic grid scoring pass + one review page, using
 # checkpoints/dinov2_vanilla_fixed/checkpoint_best.pt (plain pretrained
 # DINOv2, no continued MAE pretraining, channel-alignment fix applied —
-# see commit fcad6ce and adapt_patch_embed-channel-misalignment-bug
-# project memory).
+# see commit fcad6ce).
 #
 # The existing candidate_scores/full_dinov2_vanilla.geojson (from
 # slurm/score_and_review_full.sbatch, dated 2026-08-07) was scored with the
@@ -27,9 +26,7 @@
 # both checkpoints after growing the label set to 75 confirmed/172 hard
 # negatives (jobs 14374142/14374143) showed dinov2_vanilla_fixed improving
 # with more data (81.6% -> 82.9% pooled) while dinov2_mae_fixed got worse
-# almost everywhere except one fold (c021_r076) — see
-# adapt-patch-embed-channel-misalignment-bug / mae-continued-pretraining-
-# hurts-linear-probe project memory for the full per-fold breakdown. Since
+# almost everywhere except one fold (c021_r076). Since
 # dinov2_vanilla_fixed is the checkpoint actually responding well to more
 # labels, it gets the next active-learning round, not dinov2_mae_fixed.
 #

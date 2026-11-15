@@ -1,4 +1,4 @@
-"""Small shared helpers for the Phase 0 pipeline scripts."""
+"""Small shared helpers for the data pipeline scripts."""
 from __future__ import annotations
 
 import argparse
@@ -14,7 +14,7 @@ def load_config(path: str | Path) -> dict:
 
 
 def parse_args(description: str) -> argparse.Namespace:
-    """Standard CLI: every Phase 0 script takes --config."""
+    """Standard CLI: every data-pipeline script takes --config."""
     p = argparse.ArgumentParser(description=description)
     p.add_argument(
         "--config",

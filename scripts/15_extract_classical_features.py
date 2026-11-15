@@ -8,7 +8,7 @@ Motivation: T. fortunei has a genuinely distinctive physical signature —
 evergreen (stable NDVI year-round), a specific height range, and a
 radially-symmetric fan crown. The deep pipeline tries to re-derive that
 implicitly through a natural-photo-pretrained ViT's frozen embedding space,
-adapted to 6 channels via a hacked patch-embed conv. This script instead
+adapted to 6 channels by widening its patch-embedding conv. This script instead
 extracts the physical signal directly, from the raw [NIR,R,G,B,NDVI,CHM] /
 [R,G,B,CHM] stack, as a feature table any sklearn/xgboost/lightgbm model
 can consume.
@@ -33,8 +33,8 @@ Derived:
     since PalmProbeDataset/leave_one_tile_out_cv treat each date-tile as an
     independent example, never fusing multiple dates for the same point.
 
-fold_tile is the tile's filename (shared across date directories — see
-adapt-patch-embed-channel-misalignment-bug / c021_r076 investigation) so a
+fold_tile is the tile's filename (shared across date directories, so every
+date's view of a location lands in the same fold) so a
 leave-one-tile-out CV loop can group rows identically to linear_probe.py's,
 for an apples-to-apples comparison against its reported accuracy.
 

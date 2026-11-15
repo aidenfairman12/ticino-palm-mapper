@@ -21,8 +21,7 @@
 # validation --tiles list. scripts/15's CURRENT feature set (including the
 # CHM shape descriptors: chm_peak_ratio/skew/kurtosis/local_roughness/
 # asymmetry) is used as-is, unmodified -- this is NOT the "drop CHM shape
-# features" baseline discussed in the 2026-09-23 conversation, since that
-# needs a column-selection decision left to the user. Treat this run as a
+# features" ablation (that is native_10cm_chm_ablation.sbatch). Treat this run as a
 # fresh, resolution-consistent data point with the current feature set; the
 # shape-feature question can be answered separately by re-deriving the
 # features CSV this job writes.

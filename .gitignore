@@ -64,3 +64,6 @@ classical_features/*.csv
 dense_scores*/
 output_dir/
 sharpness_examples/
+
+# progress slide decks + their build tooling — kept locally, not part of the codebase
+reports/

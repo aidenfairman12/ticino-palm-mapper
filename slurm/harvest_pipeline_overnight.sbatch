@@ -19,15 +19,15 @@
 #   2. classical_probe.py — leave-one-tile-out CV, a sanity check that
 #      accuracy didn't collapse with the much larger, harder negative set.
 #      Purely diagnostic; does not feed step 3 (see below).
-#   3. dense_classical.py — re-scores the same 3 tiles inspected earlier
-#      this session, fitting its OWN production model from the same CSV
+#   3. dense_classical.py — re-scores the same 3 validation tiles used in
+#      prior dense-scoring runs, fitting its OWN production model from the same CSV
 #      (build_production_model fits on ALL rows, independent of step 2's
 #      CV fits — nothing needs to be passed between steps 2 and 3, they are
 #      two different readouts of the same feature table, not a pipeline).
 #   4. scripts/17, --sweep only (no --png, for speed) on all 3 tiles —
 #      prints the actual "fraction of tile above 0.5" and per-cluster
-#      verdicts, i.e. the number that answers whether this whole session's
-#      work actually worked: it was 15-21% before the harvest.
+#      verdicts, i.e. the headline metric for whether the harvested
+#      negatives helped: it was 15-21% before the harvest.
 #
 # `set -e`: if extraction fails or produces something classical_probe/
 # dense_classical then chokes on, the job stops there rather than wasting

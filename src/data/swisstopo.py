@@ -1,5 +1,5 @@
 """
-Shared swisstopo STAC helpers for the Phase 0 data pipeline.
+Shared swisstopo STAC helpers for the data pipeline.
 
 Centralises the bits that scripts 00 (RGB), 03 (feature stack / CHM) and 04
 (temporal stack) all need: STAC search, tiling math, windowed/co-registered COG
@@ -11,7 +11,8 @@ Confirmed live (2026-06):
   - DSM (surface) : ch.swisstopo.swisssurface3d-raster  asset tag "_0.5_2056" (0.5 m)
   - DTM (terrain) : ch.swisstopo.swissalti3d           asset tag "_0.5_2056" (0.5 m)
   Canopy height model (object height) = DSM - DTM.
-  NIR (SWISSIMAGE RS) is NOT freely served — request/paid only, no STAC collection.
+  NIR (SWISSIMAGE RS) is NOT freely served — request/paid only, no STAC collection;
+  see scripts/07_build_nir_stack.py.
 """
 from __future__ import annotations
 

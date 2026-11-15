@@ -3,12 +3,13 @@
 NDVI-drop signal validated visually in scripts/18's `grid` mode, at the scale
 a real training run needs (thousands, not the ~40 eyeballed by hand).
 
-Why this exists: dense scoring of the classical model (see
-dense-scoring-reveals-vegetation-detector) showed it learned "tall
+Why this exists: dense scoring of the classical model
+(src/inference/dense_classical.py) showed it learned "tall
 vegetation" rather than "palm", because its negatives are sampled >=20m from
 any positive and so almost never include another tree. Fixing that needs
-real vegetation negatives — but the user cannot reliably tell a palm from
-other canopy by eye except right at the roadside (checkpoint-2026-09-18).
+real vegetation negatives — but a human reviewer cannot reliably tell a palm
+from other canopy in the orthophotos except at the roadside, where Street
+View can confirm it.
 The March flight sidesteps that entirely: T. fortunei is evergreen, so a
 location that visibly loses NDVI between March and leaf-on is deciduous,
 which is a confident non-palm — no visual species identification required.
@@ -56,7 +57,7 @@ risk.
 --dry-run prints a threshold sweep (candidate counts at several
 --drop-threshold values, computed from the SAME per-tile arrays without
 re-scanning) instead of writing anything, since the right cutoff is a
-judgement call the user should make by eye against scripts/18's grid output,
+judgement call best made by eye against scripts/18's grid output,
 not a value baked into this script's default alone.
 
 Torch-free, like the rest of the classical pipeline. Loads scripts/15 and

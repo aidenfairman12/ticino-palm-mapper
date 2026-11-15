@@ -10,10 +10,10 @@ For each image tile this writes:
 This is the bridge from "geodata" to "ML dataset". Detection-style training can use
 the point/box GeoJSON directly; segmentation-style can use the raster mask.
 
-Reminder (proposal §3/§5): Info Flora points are WEAK POSITIVES. This script places
+Reminder (docs/DESIGN.md §3/§5): Info Flora points are WEAK POSITIVES. This script places
 labels where palms were *recorded*; it does not invent labels where none exist and
-does not guarantee completeness. For honest evaluation you still need a small,
-EXHAUSTIVELY hand-labeled held-out test set.
+does not guarantee completeness. Reliable evaluation still requires a small,
+exhaustively hand-labeled held-out test set.
 
 Superseded for the live bellinzona_full_nir AOI: labels there come from manual
 review (scripts/06, 25) rather than aligned GBIF/Info Flora occurrence points.
@@ -111,7 +111,7 @@ def main() -> None:
 
     print(f"=== {n_labeled_tiles} tiles labeled -> {out_dir} ===")
     print("Next: hand-label a seed set + an exhaustive held-out test set "
-          "(proposal §5), then Phase 1 baseline.")
+          "(docs/DESIGN.md §5), then Phase 1 baseline.")
 
 
 if __name__ == "__main__":

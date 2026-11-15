@@ -17,7 +17,7 @@
 # SSL val_loss 0.0930 (see train_ssl_bellinzona_fixed.sbatch). Compare
 # against this same run's sibling, probe_baseline_dinov2_fixed.sbatch (plain
 # DINOv2, same channel fix, no continued pretraining) to redo the
-# mae-continued-pretraining-hurts-linear-probe comparison now that both
+# continued-pretraining vs. plain-DINOv2 comparison now that both
 # checkpoints start from a correctly-aligned init — the original version of
 # that comparison (README's "SSL checkpoints" section) used the OLD,
 # misaligned checkpoints/dinov2_mae, so it's no longer a clean read on

@@ -5,7 +5,7 @@ and whether the March flight separates evergreen from deciduous numerically.
 Why this exists: the binding constraint on this project is not the model, it is
 what can be labeled. Dense scoring established that the classical model learned
 "tall vegetation" rather than "palm" because its negatives contain almost no
-other trees (see dense-scoring-reveals-vegetation-detector). The fix is real
+other trees. The fix is real
 vegetation negatives — but they can only be collected if a human can actually
 tell a palm from a non-palm in the imagery, which currently only works for
 roadside palms with street view to confirm. Every downstream choice (more
@@ -14,9 +14,9 @@ is worth an hour before any of them.
 
 Two modes.
 
-`panels` renders each point as a row of views, so you can see at a glance which
+`panels` renders each point as a row of views, to show at a glance which
 one separates palms from other canopy:
-    RGB               natural colour, what you have been looking at
+    RGB               natural colour
     false-colour IR   NIR/R/G — vegetation reads by structure, not greenness
     NDVI March        early spring: evergreen bright, deciduous bare
     NDVI August       full leaf-on, everything bright
@@ -27,7 +27,7 @@ one separates palms from other canopy:
 --blind interleaves confirmed palms with canopy controls in shuffled order and
 writes the answer key to a separate file. This matters: the question is not
 "do palms look distinctive once I know where they are" (they always do) but
-"can I identify one without being told". Grade yourself before trusting any
+"can a reviewer identify one without being told". Score the blind set before trusting any
 labeling campaign built on that judgement.
 
 `ndvi` skips rendering and measures the March separation directly — per-group
@@ -394,7 +394,7 @@ def run_panels(tiles: TileSet, palms: list[Point], controls: list[Point],
         key = out.with_suffix(".key.txt")
         key.write_text("\n".join(
             f"#{i}\t{label}\t{pt.x:.2f}\t{pt.y:.2f}" for i, (_, label, pt) in enumerate(built)) + "\n")
-        print(f"wrote {key}  — do not open until you have scored yourself")
+        print(f"wrote {key}  — do not open until the blind set has been scored")
 
 
 def run_grid(tiles: TileSet, palm_candidates: list[Point], controls: list[Point],

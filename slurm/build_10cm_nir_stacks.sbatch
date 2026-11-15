@@ -10,15 +10,14 @@
 #SBATCH --output=logs/build_10cm_nir_stacks/palm-build-10cm-nir-stacks-%j.out
 #SBATCH --error=logs/build_10cm_nir_stacks/palm-build-10cm-nir-stacks-%j.err
 
-# Step 1 of the native-10cm migration (checkpoint-2026-09-18-labeling-ceiling.md's
-# 2026-09-21/22 updates): build feature_stack_rs_20240720 and
+# Step 1 of the native-10cm migration: build feature_stack_rs_20240720 and
 # feature_stack_rs_20240810, the two never-processed dates confirmed native
 # 10cm (same as March, unlike the two 25cm dates currently in the pipeline).
 #
 # Turned out to be a 3-stage chain, not just 07 -- scratch cleanup had
 # already claimed 00's raw RGB tiles AND 03's [R,G,B,CHM] feature_stack (both
-# purely-derived, regenerable outputs; nothing irreplaceable was lost, see
-# the 2026-09-22 conversation), so both need rebuilding across the WHOLE AOI
+# purely-derived, regenerable outputs; nothing irreplaceable was lost),
+# so both need rebuilding across the WHOLE AOI
 # (~5900 tiles) before 07 has anything to read for the new dates:
 #
 #   1. 00_fetch_swissimage.py -- free RGB from swisstopo STAC (no account,

@@ -1,153 +1,162 @@
 # ticino-palm-mapper
 
 Detecting the invasive Chinese windmill palm (*Trachycarpus fortunei*) in southern
-Ticino from high-resolution aerial orthophotos, using a self-supervised /
-geo-foundation-model approach.
+Ticino, Switzerland, from 10 cm aerial orthophotos, near-infrared imagery and LiDAR
+canopy height.
 
-> **Status:** Phase 0 skeleton. See [`docs/PROJECT_PROPOSAL.md`](docs/PROJECT_PROPOSAL.md)
-> for the full feasibility assessment and methods plan — read that first.
+The palm is spreading through the region's low-elevation forests, and no
+remote-sensing detection model exists for it. Unlike plantation palm detection, the
+task here is to find scattered individuals against a heterogeneous native-forest
+background, with only presence-only citizen-science records as starting labels.
+The original feasibility assessment and methods design are in
+[`docs/DESIGN.md`](docs/DESIGN.md).
 
 ---
 
-## TL;DR
+## Status and results
 
-- **Imagery:** swisstopo SWISSIMAGE 10 cm (free, RGB, EPSG:2056). Southern Ticino
-  valleys get the full 10 cm/pixel → a ~2 m palm crown is ~20×20 px. Resolvable.
-- **Labels:** Info Flora occurrence points (presence-only; weak positives).
-- **Approach:** fine-tune a geo-FM (Phase 1) → domain-adaptive continued
-  pretraining on unlabeled Ticino tiles (Phase 2) → canton-wide density map (Phase 3)
-  → invasibility / spread model from multi-date detections (Phase 4, downstream).
-- **The novelty:** first individual-level remote-sensing map of an invasive palm
-  in temperate mixed forest.
+The project currently covers a ~6,000-tile area of interest around Bellinzona. Two
+approaches have been built and compared under **leave-one-tile-out cross-validation**,
+which keeps every image of a location in the same fold so that nearby crops cannot
+leak between train and test.
 
-## Repo layout
+| Approach | Input | Pooled LOTO accuracy |
+|---|---|---|
+| Frozen DINOv2 ViT-S + linear probe | 6-channel crop (NIR, R, G, B, NDVI, CHM) | 81.6% → 82.9% as labels grew |
+| Same, after continued MAE pretraining on Ticino tiles | same | 72.4% |
+| **Classical XGBoost on physical features** | per-point NDVI / CHM / spectral neighbourhood stats + cross-date stability | **96.7%** |
 
-```
-ticino-palm-mapper/
-├── docs/
-│   └── PROJECT_PROPOSAL.md     # full feasibility + methods reference (READ FIRST)
-├── configs/
-│   └── aoi_example.yaml        # area-of-interest + run config
-├── scripts/
-│   ├── 00_fetch_swissimage.py  # fetch SWISSIMAGE RGB tiles for an AOI (single vintage)
-│   ├── 01_fetch_infoflora.py   # fetch occurrence points (GBIF API) + reproject
-│   ├── 02_align_labels.py      # rasterize/align points onto the tile grid
-│   ├── 03_build_feature_stack.py # add co-registered LiDAR CHM -> [R,G,B,CHM] stacks
-│   ├── 04_fetch_temporal.py    # fetch multiple vintages (2018/2021/2024), aligned
-│   ├── 05_labeling_assist.py   # HTML review sheet: crop(s) + GBIF + Street View links
-│   ├── 06_prioritize_labels.py # rank points by road proximity (OSM) + NIR coverage
-│   ├── 07_build_nir_stack.py   # add co-registered NIR+NDVI -> [NIR,R,G,B,NDVI,CHM]
-│   └── check_swissimage_rs.py  # (utility) inspect delivered SWISSIMAGE RS tiles
-├── reports/                    # slide decks / write-ups (src/ holds the build tooling)
-├── src/data/swisstopo.py       # shared STAC fetch / tiling / co-registration helpers
-├── src/
-│   ├── data/                   # dataset, tiling, transforms
-│   ├── models/                 # backbones / detection heads
-│   ├── training/               # train loops (fine-tune, continued-pretrain)
-│   └── inference/              # canton-wide inference → density map
-├── notebooks/                  # exploration, sanity checks
-├── data/
-│   ├── raw/                    # downloaded imagery + raw occurrence files
-│   │   └── swissimage_rs/      # 4-band NIR deliveries (gitignored, ~66 GB)
-│   ├── interim/                # reprojected / tiled intermediates
-│   └── processed/              # model-ready tiles + aligned labels
-├── environment.yml
-└── requirements.txt
-```
+Latest classical run, restricted to the three native-10 cm acquisition dates
+(81 positive / 526 negative examples, 147 folds): **96.9% pooled accuracy, 0.84
+recall, 0.92 precision** at the point level.
 
-## Quickstart (Phase 0)
+### Findings
+- **Continued self-supervised pretraining hurt.** Continuing MAE pretraining of DINOv2
+  on unlabeled Ticino imagery reduced linear-probe accuracy by ~9 points against the
+  off-the-shelf encoder. The gap appeared in two independent comparisons, before
+  and after a channel-alignment bug fix. A lower reconstruction loss also did not
+  predict better downstream features: a mask-ratio-0.5 run reached lower SSL loss
+  (0.065 vs 0.092) but probed worse (75.3% vs 82.4%). MAE optimizes pixel
+  reconstruction, not linear separability.
+- **Physical features beat learned embeddings at this label scale.** The palm has a
+  distinctive physical signature: evergreen (stable NDVI between leaf-off and leaf-on
+  flights), a characteristic height, and a compact crown. Hand-built features capture
+  it directly, train in seconds on a CPU, and are interpretable.
+- **Point classification does not yet transfer to wall-to-wall detection.** When
+  the classical model is run per pixel over whole validation tiles
+  ([`src/inference/dense_classical.py`](src/inference/dense_classical.py)), it
+  recovers 56–60% of known palms but with only ~2–4% peak precision. It has largely
+  learned "tall evergreen vegetation". Dense scoring showed the cause: random
+  negatives are rarely other trees. Most of the recent work targets this problem:
+  harvesting deciduous negatives from the March NDVI drop, collecting hand-verified
+  vegetation negatives through Google Earth review, and moving to native-10 cm dates
+  only.
+- **Data quality matters as much as the model.** Three of the six delivered
+  NIR acquisition dates turned out to be 25 cm imagery upsampled to 10 cm (~50× blurrier
+  by Laplacian variance; [`scripts/20`](scripts/20_check_acquisition_sharpness.py),
+  [`23`](scripts/23_check_raw_sharpness.py)). A channel-order bug in the 6-channel
+  patch-embedding adaptation was found and fixed (commit `fcad6ce`), and every
+  checkpoint was regenerated afterwards.
 
-> ✅ Phase 0 is **wired and runnable** end-to-end against live data:
-> - `00` streams SWISSIMAGE 10 cm tiles from swisstopo's STAC COGs (no account).
-> - `01` fetches *T. fortunei* occurrence points straight from the **GBIF API**
->   (default; `labels.source: gbif`). Swap to a manual Info Flora point export
->   later with `labels.source: file`.
-> - `02` aligns the points onto the tile grid (point GeoJSON + raster masks).
->
-> Only the optional Earth Engine route in `00` (`imagery.source: gee`) is still a
-> stub — the STAC route needs no account and is the default.
+### Labels
+Starting labels were GBIF / Info Flora presence points, which are incomplete and
+sometimes mislocated. All labels used for training and evaluation were verified by hand:
+
+- **~175 confirmed palm locations**, from Street View–assisted verification of
+  occurrence points ([`05`](scripts/05_labeling_assist.py)), active-learning review of
+  model-scored candidates ([`10`](scripts/10_review_candidates.py) /
+  [`11`](scripts/11_merge_review_verdicts.py)), and Google Earth review
+  ([`24`](scripts/24_export_10cm_footprint_kml.py) / [`25`](scripts/25_import_earth_review_batch.py))
+- **~320 hand-verified hard negatives** (204 from active learning, 115 from Google Earth review)
+- 13,746 automatically harvested deciduous negatives ([`19`](scripts/19_harvest_deciduous_negatives.py)),
+  kept for ablations
+
+---
+
+## Pipeline
+
+All scripts take explicit arguments (`--help`), and the data scripts read an AOI config from
+[`configs/`](configs/). Everything is in **EPSG:2056 (CH1903+ / LV95)**.
+
+| Stage | Scripts / modules |
+|---|---|
+| **Imagery and features** | `00` fetch SWISSIMAGE RGB tiles (swisstopo STAC) · `03` add LiDAR canopy height (DSM − DTM) · `04` multi-year RGB stack · `07` fuse SWISSIMAGE RS → `[NIR, R, G, B, NDVI, CHM]` |
+| **Occurrence labels** | `01` fetch GBIF / Info Flora points · `02` align points to tiles · `05` Street View verification sheet · `06` prioritize points by verification cost · `08`, `09` KML overlays for Google Earth |
+| **Deep pipeline** | [`src/models/mae.py`](src/models/mae.py) MAE on a DINOv2 backbone · [`src/training/pretrain_ssl.py`](src/training/pretrain_ssl.py) continued pretraining · `13` export plain-DINOv2 baseline · [`src/training/linear_probe.py`](src/training/linear_probe.py) LOTO linear probe · [`src/inference/score_candidates.py`](src/inference/score_candidates.py) grid scoring |
+| **Classical pipeline** | `15` feature extraction · [`src/training/classical_probe.py`](src/training/classical_probe.py) LOTO RF/XGBoost · `16` hyperparameter sweep · `27` feature-subset ablation · [`src/inference/score_candidates_classical.py`](src/inference/score_candidates_classical.py) grid scoring · [`src/inference/dense_classical.py`](src/inference/dense_classical.py) per-pixel scoring |
+| **Active learning and review** | `10` HTML review page for scored candidates · `11` merge verdicts into labels · `12` score summary · `19` harvest deciduous negatives · `24`, `25` Google Earth review round-trip |
+| **Diagnostics** | `14` CV failure cases · `17` dense-surface peak readout · `18` view comparison and NDVI separability · `20`–`23` acquisition sharpness and coverage · `26` validation-tile selection · `check_swissimage_rs.py` inspect RS deliveries |
+
+[`slurm/`](slurm/) holds the batch jobs used to run each experiment on the university
+HPC. Each job's header comment records its hypothesis and configuration.
+
+---
+
+## Reproducing
 
 ```bash
-# 1. environment (Phase 0 needs only the geo stack — torch/timm come later)
-python3 -m venv .venv && source .venv/bin/activate
-pip install rasterio rioxarray geopandas shapely pyproj fiona numpy pandas \
-            xarray scikit-image scikit-learn matplotlib pyyaml tqdm requests
-# (or the full conda env: conda env create -f environment.yml)
+# Environment (conda-forge handles the GDAL/PROJ stack)
+conda env create -f environment.yml && conda activate ticino-palm
+# or build the container used on the HPC:
+apptainer build ticino-palm.sif apptainer.def
 
-# 2. a palm-dense sanity AOI near Bellinzona is preset in configs/aoi_example.yaml
-
-# 3. fetch imagery for the AOI
-python scripts/00_fetch_swissimage.py --config configs/aoi_example.yaml
-
-# 4. fetch occurrence points (GBIF) for the AOI
-python scripts/01_fetch_infoflora.py --config configs/aoi_example.yaml
-
-# 5. align labels onto the tile grid
-python scripts/02_align_labels.py --config configs/aoi_example.yaml
-
-# 6. (optional) add a co-registered LiDAR height channel -> [R,G,B,CHM] stacks
+# 1. Data: small example AOI near Bellinzona (configs/aoi_example.yaml)
+python scripts/00_fetch_swissimage.py   --config configs/aoi_example.yaml
+python scripts/01_fetch_infoflora.py    --config configs/aoi_example.yaml
+python scripts/02_align_labels.py       --config configs/aoi_example.yaml
 python scripts/03_build_feature_stack.py --config configs/aoi_example.yaml
+python scripts/07_build_nir_stack.py    --config configs/aoi_example.yaml   # needs SWISSIMAGE RS
 
-# 7. (optional) fetch the 2018/2021/2024 time series (aligned per col/row)
-python scripts/04_fetch_temporal.py --config configs/aoi_example.yaml
-
-# 8. (optional) build an HTML sheet to verify points via Street View before labeling
-python scripts/05_labeling_assist.py --config configs/aoi_example.yaml
+# 2. Classical pipeline (CPU, minutes)
+python scripts/15_extract_classical_features.py --tile-dirs <feature_stack_rs dirs> \
+    --confirmed-points data/interim/labels/bellinzona_MASTER_confirmed_palms.geojson \
+    --hard-negatives data/interim/labels/*_hard_negatives.geojson \
+    --output classical_features/features.csv
+python -m src.training.classical_probe --features-csv classical_features/features.csv --model xgboost
 ```
 
-**On inputs (from Phase 0 feasibility work):** RGB alone can't reliably separate
-palms from look-alike crowns at 10 cm. The LiDAR **CHM** (script 03) and **temporal
-persistence** (script 04) are the free signals that help — fuse them in the model
-rather than relying on RGB. **NIR** (SWISSIMAGE RS) would likely help most but is
-request/paid only. Treat occurrence points as weak positives and ground-truth your
-test set with the labeling-assist sheet (script 05), not by eyeballing orthophotos.
+Steps `00`–`04` use only free swisstopo data and need no account. The NIR channel
+(`07`) requires the SWISSIMAGE RS product, which swisstopo provides on request; it is
+not redistributed here. [`slurm/native_10cm_baseline.sbatch`](slurm/native_10cm_baseline.sbatch)
+shows the full classical run (extraction → CV → dense scoring → readout).
 
-After this, eyeball a few tiles in QGIS with the points overlaid and confirm you
-can see palms with your own eyes **before** building anything heavier.
+---
 
-> ⚠️ **Don't export a Welten-Sutter "species list" from Info Flora** — it's a
-> per-square checklist with **no coordinates** and can't place labels. You want a
-> per-observation export *with* X/Y (which is what the GBIF route returns).
+## Repository layout
 
-## CRS note
+```
+configs/            AOI and run configs
+data/interim/labels hand-verified palm points and hard negatives (tracked)
+data/raw|processed  imagery and feature stacks (not tracked; large/licensed)
+docs/DESIGN.md      feasibility assessment and methods design
+notebooks/          MAE reconstruction inspection
+review/             generated HTML review pages from active-learning rounds
+candidate_scores/   small scored-candidate outputs
+scripts/            numbered pipeline, labeling and diagnostic scripts
+slurm/              HPC batch jobs, one per experiment
+src/
+  data/             tiling, normalization, datasets, swisstopo STAC helpers
+  models/           MAE with channel-adapted DINOv2 backbone
+  training/         SSL pretraining, linear probe, classical probe
+  inference/        grid and dense scoring
+```
 
-Everything Swiss is **CH1903+ / LV95 = EPSG:2056**. All scripts standardize on it.
-Don't mix in WGS84 except at fetch boundaries (e.g. some APIs want lon/lat).
+---
 
-## Data license
+## Limitations and next steps
+- **Dense precision** is the main open problem (see Findings). Next steps: more
+  hand-verified vegetation negatives from inside the native-10 cm footprint, crown-shape
+  features computed at a scale the 0.5 m LiDAR can actually support, and a dense
+  detection head trained on point-derived density targets.
+- **Evaluation** is cross-validated over a few hundred labeled points. An exhaustively
+  labeled held-out test area is needed before reporting detection metrics.
+- **Scale:** the work so far covers the Bellinzona AOI. Canton-wide mapping and the
+  spread/invasibility modeling in [`docs/DESIGN.md`](docs/DESIGN.md) §6 are future work.
 
-swisstopo free geodata (incl. SWISSIMAGE) may be used, processed, and used
-commercially **with mandatory source citation**. Cite swisstopo. Check Info Flora's
-terms for the occurrence data before any redistribution.
-
-## SSL checkpoints
-
-`checkpoints/dinov2_mae/checkpoint_best.pt` (small backbone, mask-ratio 0.75, epoch
-148, SSL val_loss 0.0918) is the checkpoint currently in use for the linear
-probe / active-learning scoring pipeline — **not**
-`checkpoints/trial_maskratio/checkpoint_best.pt` (small backbone, mask-ratio
-0.5, epoch 137, SSL val_loss 0.0647), despite the latter reaching a lower SSL
-reconstruction loss.
-
-The reason: lower SSL val_loss didn't translate to better downstream
-performance. Comparing the two on `src/training/linear_probe.py`'s
-leave-one-tile-out CV (default `--pos-weight-multiplier`):
-
-| checkpoint | SSL val_loss | mean per-fold accuracy | pooled accuracy | job |
-|---|---|---|---|---|
-| `checkpoints/dinov2_mae` | 0.0918 | 0.819 | 0.824 (tp=106, tn=265, fp=68, fn=11) | 11498941 |
-| `checkpoints/trial_maskratio` | 0.0647 | 0.743 | 0.753 (tp=99, tn=240, fp=93, fn=18) | 11644022 |
-
-A lower masked-reconstruction loss just means mask-ratio 0.5 is an easier
-pretext task (fewer patches to reconstruct from), not that the encoder
-learned better features for the actual palm/non-palm discrimination task —
-worth remembering before picking a future SSL run's "winner" on val_loss
-alone. `checkpoints/trial_maskratio/` is kept on disk rather than deleted, in
-case it's useful for future comparison, but nothing in the active pipeline
-should point at it.
-
-## Next steps
-
-1. Wire up the `TODO`s in `scripts/00`–`02` against the real endpoints.
-2. Hand-label a seed set + an **exhaustive held-out test set** (see proposal §5).
-3. Phase 1 baseline → Phase 2 SSL → Phase 3 map.
+## Data and licensing
+- swisstopo geodata (SWISSIMAGE, swissSURFACE3D, swissALTI3D) may be used, processed and
+  used commercially with mandatory source citation: **© swisstopo**.
+- Occurrence records come from GBIF (mirroring Info Flora). Check Info Flora's terms
+  before redistributing raw occurrence data.
+- SWISSIMAGE RS (NIR) was supplied by swisstopo on request and is not included in this
+  repository.
